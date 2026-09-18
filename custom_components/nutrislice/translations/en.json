@@ -3,9 +3,9 @@
     "step": {
       "user": {
         "title": "Connect to Nutrislice",
-        "description": "Enter your school district name/slug (e.g. `my-district`) or paste your school's Nutrislice URL (e.g. `https://my-district.nutrislice.com/menu/elementary-school/lunch`).",
+        "description": "Enter your school district name/slug (e.g. my-district) or paste your school's Nutrislice webpage address (e.g. my-district.nutrislice.com).",
         "data": {
-          "district": "District Name or Nutrislice URL"
+          "district": "District Name or Nutrislice Address"
         }
       },
       "school": {
