@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] - 2026-09-18
+
+### Fixed
+- README examples, checked against a running Home Assistant:
+  - Removed the raw `days` notification template, which always failed with `UndefinedError`.
+  - The evening-before notification now names the day ("Lunch for Monday") instead of saying "Tomorrow" over weekends, and uses a native state condition.
+  - The markdown card no longer errors when the sensors are unavailable.
+
+### Changed
+- Simplified the README and documented the sensor attributes the examples use.
+
 ## [1.3.0] - 2026-09-18
 
 ### Added
