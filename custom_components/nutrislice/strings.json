@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Nutrislice",
+        "description": "Enter your school district name/slug (e.g. `my-district`) or paste your school's Nutrislice URL (e.g. `https://my-district.nutrislice.com/menu/elementary-school/lunch`).",
+        "data": {
+          "district": "District Name or Nutrislice URL"
+        }
+      },
+      "school": {
+        "title": "Select School",
+        "description": "Found schools for district '{district}'. Select your school:",
+        "data": {
+          "school_slug": "School"
+        }
+      },
+      "menu_types": {
+        "title": "Select Menus to Track",
+        "description": "Choose which meal menus you want to track for {school_name}:",
+        "data": {
+          "menu_types": "Meal Menus"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Nutrislice servers.",
+      "invalid_district": "Could not find a valid Nutrislice district.",
+      "no_schools_found": "No schools found for this district.",
+      "school_not_found": "Selected school was not found.",
+      "no_menu_types_selected": "Please select at least one meal menu to track.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This school is already configured in Home Assistant."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nutrislice Configuration",
+        "data": {
+          "scan_interval_hours": "Update Interval (hours)",
+          "next_school_day_on_weekend": "Show next school day menu on weekends for 'Tomorrow' sensor"
+        }
+      }
+    }
+  }
+}
