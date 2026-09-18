@@ -10,7 +10,7 @@
       },
       "school": {
         "title": "Select School",
-        "description": "Found schools for district '{district}'. Select your school:",
+        "description": "Found schools for district {district}. Select your school:",
         "data": {
           "school_slug": "School"
         }
