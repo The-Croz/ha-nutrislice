@@ -63,13 +63,12 @@ ENTREE_SECTION_KEYWORDS: Final = (
     "express",
 )
 
-SIDE_SECTION_KEYWORDS: Final = (
-    "fruit",
-    "vegetable",
-    "side",
-    "salad",
-    "dessert",
-)
+# Nutrislice food_category values, which beat the section an item is listed under
+SIDE_FOOD_CATEGORIES: Final = {"side", "fruit", "vegetable", "dessert", "bread", "grain"}
+BEVERAGE_FOOD_CATEGORIES: Final = {"beverage", "milk", "drink", "juice"}
+CONDIMENT_FOOD_CATEGORIES: Final = {"condiment", "dressing", "dip"}
+# e.g. "sauce", "sauce_grvy"
+CONDIMENT_FOOD_CATEGORY_PREFIXES: Final = ("sauce",)
 
 IGNORE_SECTION_KEYWORDS: Final = (
     "condiment",

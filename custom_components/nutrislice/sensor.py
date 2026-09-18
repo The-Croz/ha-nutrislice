@@ -132,6 +132,8 @@ class NutrisliceTodayMenuSensor(NutrisliceBaseSensor):
             ATTR_ENTREES: today.entrees,
             ATTR_SIDES: today.sides,
             "beverages": today.beverages,
+            "fruits": today.fruits,
+            "vegetables": today.vegetables,
             ATTR_CATEGORIES: today.categories,
             ATTR_MENU_ITEMS: [
                 {
@@ -219,6 +221,8 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
             ATTR_ENTREES: target.entrees,
             ATTR_SIDES: target.sides,
             "beverages": target.beverages,
+            "fruits": target.fruits,
+            "vegetables": target.vegetables,
             ATTR_CATEGORIES: target.categories,
             ATTR_MENU_ITEMS: [
                 {

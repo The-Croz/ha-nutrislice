@@ -83,7 +83,7 @@ For each configured school and meal type:
 
 > **Upgrading from 1.2.0 or earlier?** Entity IDs you already have are kept as-is by Home Assistant, so your automations keep working. Only the display names change (the redundant trailing "Calendar" is dropped).
 
-The **Today** and **Tomorrow** sensors carry `date`, `entrees`, `sides`, `beverages`, and `menu_items` (with calories and allergens) attributes. The **Tomorrow** sensor also has `is_next_school_day`, which is `true` when it's showing a later school day because tomorrow has no menu.
+The **Today** and **Tomorrow** sensors carry `date`, `entrees`, `sides`, `fruits`, `vegetables`, `beverages`, and `menu_items` (with calories and allergens) attributes. The **Tomorrow** sensor also has `is_next_school_day`, which is `true` when it's showing a later school day because tomorrow has no menu. `sides` includes fruit and vegetables; `fruits` and `vegetables` list those separately.
 
 The examples below use `my_school_lunch` as a placeholder. Replace it with your own entity IDs, which you can find under **Settings** > **Devices & Services** > **Nutrislice**.
 
@@ -97,7 +97,7 @@ The calendar entities this integration creates are read-only. To get school meal
 2. Go to **Settings** > **Devices & Services** > **Nutrislice** and click **Configure**.
 3. Pick the calendar under **Sync menus to calendar** and submit.
 
-Upcoming meals are then copied as all-day events (titled like `Lunch: Cheeseburger, Pizza`, with the school as the location) right away, after every menu update, and whenever you call the `nutrislice.sync_calendar` action. All menu types for a school go to the same calendar. Clear the field to turn syncing off.
+Upcoming meals are then copied as all-day events (titled like `🍽️ Lunch: Cheeseburger, Pizza`, with the menu grouped into 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, and 🥛 Beverages in the description, and the school as the location) right away, after every menu update, and whenever you call the `nutrislice.sync_calendar` action. All menu types for a school go to the same calendar. Clear the field to turn syncing off.
 
 **Good to know:**
 - Sync only adds events. Home Assistant has no way for an integration to edit or delete calendar events, so a meal is created once and never rewritten. If the school changes a menu after it was synced, edit or delete that event on the target calendar yourself.

@@ -19,12 +19,15 @@ from .const import (
     CONF_SCHOOL_NAME,
     CONF_SCHOOL_SLUG,
     DEFAULT_SCAN_INTERVAL_HOURS,
+    BEVERAGE_FOOD_CATEGORIES,
+    CONDIMENT_FOOD_CATEGORIES,
+    CONDIMENT_FOOD_CATEGORY_PREFIXES,
     DEFAULT_UPCOMING_WEEKS,
     ENTREE_FOOD_CATEGORIES,
     ENTREE_SECTION_KEYWORDS,
     IGNORE_SECTION_KEYWORDS,
     LOGGER,
-    SIDE_SECTION_KEYWORDS,
+    SIDE_FOOD_CATEGORIES,
 )
 
 
@@ -51,9 +54,13 @@ class ParsedDayMenu:
     is_holiday: bool
     has_menu: bool
     entrees: list[str] = field(default_factory=list)
+    # Everything that isn't an entree, beverage, or condiment (fruit and vegetables included)
     sides: list[str] = field(default_factory=list)
     beverages: list[str] = field(default_factory=list)
     condiments: list[str] = field(default_factory=list)
+    # Subsets of sides, split out for display
+    fruits: list[str] = field(default_factory=list)
+    vegetables: list[str] = field(default_factory=list)
     items: list[ParsedFoodItem] = field(default_factory=list)
     categories: dict[str, list[str]] = field(default_factory=dict)
     raw_day: dict[str, Any] = field(default_factory=dict)
@@ -75,19 +82,25 @@ class ParsedDayMenu:
 
     @property
     def formatted_description(self) -> str:
-        """Formatted description suitable for calendar events or notifications."""
-        lines: list[str] = []
-        if self.entrees:
-            lines.append("🍽️ Entrees:\n• " + "\n• ".join(self.entrees))
-        if self.sides:
-            lines.append("🥗 Sides & Fruits:\n• " + "\n• ".join(self.sides))
-        if self.beverages:
-            lines.append("🥛 Beverages:\n• " + "\n• ".join(self.beverages))
-        return "\n\n".join(lines) if lines else "No menu items published."
+        """Menu grouped by course with emoji headings, for calendar events and notifications."""
+        other_sides = [s for s in self.sides if s not in self.fruits and s not in self.vegetables]
+        groups = (
+            ("🍽️ Entrees", self.entrees),
+            ("🥖 Sides", other_sides),
+            ("🍎 Fruit", self.fruits),
+            ("🥦 Vegetables", self.vegetables),
+            ("🥛 Beverages", self.beverages),
+        )
+        blocks = [
+            f"{heading}:\n" + "\n".join(f"• {name}" for name in names)
+            for heading, names in groups
+            if names
+        ]
+        return "\n\n".join(blocks) if blocks else "No menu items published."
 
     def calendar_summary(self, menu_name: str) -> str:
-        """Return the calendar event title, e.g. "Lunch: Cheeseburger, Pizza"."""
-        return f"{menu_name}: {self.summary}"
+        """Return the calendar event title, e.g. "🍽️ Lunch: Cheeseburger, Pizza"."""
+        return f"{calendar_title_prefix(menu_name)}{self.summary}"
 
 
 @dataclass
@@ -105,6 +118,21 @@ class NutrisliceMenuData:
     tomorrow: ParsedDayMenu | None
     next_school_day: ParsedDayMenu | None
     last_updated: datetime
+
+
+def menu_emoji(menu_name: str) -> str:
+    """Return an emoji for a meal type, matching the description's style."""
+    name = menu_name.casefold()
+    if "breakfast" in name:
+        return "🥞"
+    if "snack" in name:
+        return "🍪"
+    return "🍽️"
+
+
+def calendar_title_prefix(menu_name: str) -> str:
+    """Return the start of a meal's calendar event title, e.g. "🍽️ Lunch: "."""
+    return f"{menu_emoji(menu_name)} {menu_name}: "
 
 
 def menu_entity_name(school_name: str, menu_name: str, suffix: str = "") -> str | None:
@@ -125,6 +153,35 @@ def menu_entity_name(school_name: str, menu_name: str, suffix: str = "") -> str 
     return " ".join(part for part in parts if part) or None
 
 
+def classify_item(food_category: str, section: str) -> str:
+    """Return "entree", "side", "beverage", or "condiment" for a menu item.
+
+    The item's own food_category is trusted first, because schools often list
+    breads, gravies, and rolls under an "Entree" or "Express" heading. The
+    section heading only decides when the category says nothing useful.
+    """
+    if food_category in CONDIMENT_FOOD_CATEGORIES or food_category.startswith(
+        CONDIMENT_FOOD_CATEGORY_PREFIXES
+    ):
+        return "condiment"
+    if food_category in BEVERAGE_FOOD_CATEGORIES:
+        return "beverage"
+    if food_category in ENTREE_FOOD_CATEGORIES:
+        return "entree"
+    if food_category in SIDE_FOOD_CATEGORIES:
+        return "side"
+
+    is_entree_section = any(kw in section for kw in ENTREE_SECTION_KEYWORDS)
+    if food_category == "salad":
+        # A chef salad under "Express" is a meal; a side salad isn't
+        return "entree" if is_entree_section else "side"
+    if any(kw in section for kw in IGNORE_SECTION_KEYWORDS):
+        return "beverage" if ("milk" in section or "beverage" in section) else "condiment"
+    if is_entree_section:
+        return "entree"
+    return "side"
+
+
 def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
     """Parse a day dictionary from Nutrislice into ParsedDayMenu."""
     date_str = raw_day.get("date", "")
@@ -140,6 +197,8 @@ def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
     sides: list[str] = []
     beverages: list[str] = []
     condiments: list[str] = []
+    fruits: list[str] = []
+    vegetables: list[str] = []
     categories: dict[str, list[str]] = {}
     parsed_items: list[ParsedFoodItem] = []
 
@@ -180,40 +239,25 @@ def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
                     if isinstance(icon, dict) and icon.get("name"):
                         allergens.append(icon["name"])
 
-        # Categorize
-        is_entree = False
-        is_side = False
-
-        if any(kw in section_lower for kw in IGNORE_SECTION_KEYWORDS) or food_category in (
-            "condiment",
-            "beverage",
-            "milk",
-        ):
-            if "milk" in section_lower or "beverage" in section_lower or food_category in ("milk", "beverage"):
-                if name not in beverages:
-                    beverages.append(name)
-            else:
-                if name not in condiments:
-                    condiments.append(name)
-        elif (
-            food_category in ENTREE_FOOD_CATEGORIES
-            or any(kw in section_lower for kw in ENTREE_SECTION_KEYWORDS)
-        ):
-            is_entree = True
-            if name not in entrees:
-                entrees.append(name)
-        elif (
-            food_category in ("side", "salad", "fruit", "vegetable")
-            or any(kw in section_lower for kw in SIDE_SECTION_KEYWORDS)
-        ):
-            is_side = True
-            if name not in sides:
-                sides.append(name)
-        else:
-            # If uncertain, treat as side/other
-            is_side = True
-            if name not in sides:
-                sides.append(name)
+        kind = classify_item(food_category, section_lower)
+        is_entree = kind == "entree"
+        is_side = kind == "side"
+        bucket = {
+            "entree": entrees,
+            "side": sides,
+            "beverage": beverages,
+            "condiment": condiments,
+        }[kind]
+        if name not in bucket:
+            bucket.append(name)
+        if is_side:
+            is_fruit = food_category == "fruit" or "fruit" in section_lower
+            is_vegetable = food_category == "vegetable" or any(
+                kw in section_lower for kw in ("vegetable", "veggie")
+            )
+            group = fruits if is_fruit else vegetables if is_vegetable else None
+            if group is not None and name not in group:
+                group.append(name)
 
         categories.setdefault(current_section, []).append(name)
         parsed_items.append(
@@ -240,6 +284,8 @@ def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
         sides=sides,
         beverages=beverages,
         condiments=condiments,
+        fruits=fruits,
+        vegetables=vegetables,
         items=parsed_items,
         categories=categories,
         raw_day=raw_day,

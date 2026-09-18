@@ -74,7 +74,7 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
         """Test event property returns today's meal event."""
         event = self.calendar.event
         self.assertIsNotNone(event)
-        self.assertEqual(event.summary, "Lunch: Cheeseburger, Cheese Pizza")
+        self.assertEqual(event.summary, "🍽️ Lunch: Cheeseburger, Cheese Pizza")
         self.assertEqual(event.start, self.today_date)
         self.assertEqual(event.end, self.today_date + timedelta(days=1))
         self.assertIn("Apple", event.description)
@@ -87,8 +87,8 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
 
         events = await self.calendar.async_get_events(None, start_dt, end_dt)
         self.assertEqual(len(events), 2)
-        self.assertEqual(events[0].summary, "Lunch: Cheeseburger, Cheese Pizza")
-        self.assertEqual(events[1].summary, "Lunch: Chicken Wings")
+        self.assertEqual(events[0].summary, "🍽️ Lunch: Cheeseburger, Cheese Pizza")
+        self.assertEqual(events[1].summary, "🍽️ Lunch: Chicken Wings")
 
     async def test_async_get_events_end_is_exclusive(self):
         """A day starting exactly at the (exclusive) range end is not returned."""
@@ -96,7 +96,7 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
         end_dt = datetime.combine(self.today_date + timedelta(days=2), datetime.min.time())
 
         events = await self.calendar.async_get_events(None, start_dt, end_dt)
-        self.assertEqual([e.summary for e in events], ["Lunch: Cheeseburger, Cheese Pizza"])
+        self.assertEqual([e.summary for e in events], ["🍽️ Lunch: Cheeseburger, Cheese Pizza"])
 
     async def test_async_get_events_excludes_days_before_range(self):
         """Days that end before the range starts are not returned."""
@@ -104,7 +104,7 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
         end_dt = datetime.combine(self.today_date + timedelta(days=7), datetime.min.time())
 
         events = await self.calendar.async_get_events(None, start_dt, end_dt)
-        self.assertEqual([e.summary for e in events], ["Lunch: Chicken Wings"])
+        self.assertEqual([e.summary for e in events], ["🍽️ Lunch: Chicken Wings"])
 
 
 if __name__ == "__main__":

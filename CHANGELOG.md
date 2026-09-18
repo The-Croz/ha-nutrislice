@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-09-18
+
+### Changed
+- **Calendar events are grouped by course with emoji headings.** The description now lists 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, and 🥛 Beverages, and the title starts with a meal emoji (🍽️ lunch, 🥞 breakfast, 🍪 snack), e.g. `🍽️ Lunch: Salisbury Steak, Pepperoni Pizza`.
+- Calendar sync recognizes meals it synced before this release (titles without the emoji), so they aren't created again.
+
+### Added
+- `fruits` and `vegetables` attributes on the Today and Tomorrow sensors. `sides` still includes them, so existing templates keep working.
+
+### Fixed
+- **Menu items are categorized by their own food category first**, not just the heading they're listed under. Breadsticks and rolls listed under "Entree" are now sides, gravy is a condiment, and juice under "Fruit" is a beverage, so event titles and the entree sensors list only actual entrees.
+
 ## [1.3.2] - 2026-09-18
 
 ### Changed

@@ -105,7 +105,7 @@ class TestCalendarSync(unittest.IsolatedAsyncioTestCase):
             [
                 {
                     "entity_id": TARGET,
-                    "summary": "Lunch: Cheeseburger, Pizza",
+                    "summary": "🍽️ Lunch: Cheeseburger, Pizza",
                     "description": self.lunch.days_by_date[self.today.isoformat()].formatted_description,
                     "location": "Lincoln Elementary",
                     "start_date": self.today.isoformat(),
@@ -113,7 +113,7 @@ class TestCalendarSync(unittest.IsolatedAsyncioTestCase):
                 },
                 {
                     "entity_id": TARGET,
-                    "summary": "Lunch: Chicken Wings",
+                    "summary": "🍽️ Lunch: Chicken Wings",
                     "description": self.lunch.days_by_date[(self.today + timedelta(days=2)).isoformat()].formatted_description,
                     "location": "Lincoln Elementary",
                     "start_date": (self.today + timedelta(days=2)).isoformat(),
@@ -150,7 +150,29 @@ class TestCalendarSync(unittest.IsolatedAsyncioTestCase):
         created = await async_sync_entry(hass, entry, self.coordinator)
 
         self.assertEqual(created, 1)
-        self.assertEqual(hass.services.created[0]["summary"], "Lunch: Chicken Wings")
+        self.assertEqual(hass.services.created[0]["summary"], "🍽️ Lunch: Chicken Wings")
+
+    async def test_meals_synced_by_older_versions_are_not_duplicated(self):
+        """Pre-1.4.0 titles had no emoji; the new titles must not re-create them."""
+        existing = [
+            {"start": self.today.isoformat(), "summary": "Lunch: Cheeseburger, Pizza", "location": "Lincoln Elementary"},
+            {"start": (self.today + timedelta(days=2)).isoformat(), "summary": "🍽️ Lunch: Chicken Wings", "location": "Lincoln Elementary"},
+        ]
+        hass = self.hass(existing=existing)
+        entry = MockConfigEntry(options={"sync_calendar": TARGET})
+
+        self.assertEqual(await async_sync_entry(hass, entry, self.coordinator), 0)
+
+    async def test_similar_menu_name_is_not_a_match(self):
+        """A "Preschool Lunch" event doesn't count as the "Lunch" meal."""
+        existing = [
+            {"start": self.today.isoformat(), "summary": "🍽️ Preschool Lunch: Pasta", "location": "Lincoln Elementary"},
+            {"start": self.today.isoformat(), "summary": "Preschool Lunch: Pasta", "location": "Lincoln Elementary"},
+        ]
+        hass = self.hass(existing=existing)
+        entry = MockConfigEntry(options={"sync_calendar": TARGET})
+
+        self.assertEqual(await async_sync_entry(hass, entry, self.coordinator), 2)
 
     async def test_unrelated_events_do_not_block_sync(self):
         existing = [
@@ -210,7 +232,7 @@ class TestCalendarSync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             [c["summary"] for c in hass.services.created],
-            ["Breakfast: Waffles", "Lunch: Cheeseburger, Pizza", "Lunch: Chicken Wings"],
+            ["🥞 Breakfast: Waffles", "🍽️ Lunch: Cheeseburger, Pizza", "🍽️ Lunch: Chicken Wings"],
         )
 
     async def test_lookup_failure_is_logged_not_raised(self):

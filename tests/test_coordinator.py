@@ -9,8 +9,45 @@ setup_ha_mocks()
 from custom_components.nutrislice.coordinator import (
     NutrisliceMenuData,
     ParsedDayMenu,
+    calendar_title_prefix,
+    classify_item,
     parse_day,
 )
+
+
+def item(name, category):
+    return {"food": {"name": name, "food_category": category}}
+
+
+def section(text):
+    return {"is_section_title": True, "text": text}
+
+
+# A real Pender County Schools (greatschools) lunch, 2026-09-21
+REAL_LUNCH = {
+    "date": "2026-09-21",
+    "menu_items": [
+        section("Daily Serve Entree"),
+        item("Peanut Butter & Jelly Sandwich", "sandwich"),
+        section("Entree"),
+        item("Fresh Baked Breadstick", "side"),
+        item("Salisbury Steak", "entree"),
+        item("Beef Gravy", "sauce_grvy"),
+        item("Pepperoni Pizza", "pizza"),
+        section("Express"),
+        item("Egg Chef Salad", "salad"),
+        item("Dinner Roll", "side"),
+        section("Fruit"),
+        item("Red Delicious Apple", "side"),
+        item("Fruit Juice", "beverage"),
+        section("Vegetable"),
+        item("Mashed Potatoes", "side"),
+        section("Milk"),
+        item("1% Milk", "beverage"),
+        section("Condiments"),
+        item("Ketchup", "condiment"),
+    ],
+}
 
 
 class TestNutrisliceCoordinatorParser(unittest.TestCase):
@@ -138,6 +175,69 @@ class TestNutrisliceCoordinatorParser(unittest.TestCase):
         parsed = parse_day(raw_day)
         self.assertLessEqual(len(parsed.summary), 250)
         self.assertTrue(parsed.summary.endswith("..."))
+
+
+class TestClassification(unittest.TestCase):
+    """Items are grouped by their own category before the section they're listed under."""
+
+    def test_real_menu_entrees_are_only_the_mains(self):
+        parsed = parse_day(REAL_LUNCH)
+        self.assertEqual(
+            parsed.entrees,
+            ["Peanut Butter & Jelly Sandwich", "Salisbury Steak", "Pepperoni Pizza", "Egg Chef Salad"],
+        )
+
+    def test_breads_under_entree_headings_are_sides(self):
+        parsed = parse_day(REAL_LUNCH)
+        self.assertIn("Fresh Baked Breadstick", parsed.sides)
+        self.assertIn("Dinner Roll", parsed.sides)
+
+    def test_gravy_is_a_condiment(self):
+        self.assertEqual(parse_day(REAL_LUNCH).condiments, ["Beef Gravy", "Ketchup"])
+
+    def test_juice_listed_under_fruit_is_a_beverage(self):
+        self.assertEqual(parse_day(REAL_LUNCH).beverages, ["Fruit Juice", "1% Milk"])
+
+    def test_fruit_and_vegetables_split_out_of_sides(self):
+        parsed = parse_day(REAL_LUNCH)
+        self.assertEqual(parsed.fruits, ["Red Delicious Apple"])
+        self.assertEqual(parsed.vegetables, ["Mashed Potatoes"])
+        # sides still holds everything, so existing templates keep working
+        self.assertEqual(
+            parsed.sides,
+            ["Fresh Baked Breadstick", "Dinner Roll", "Red Delicious Apple", "Mashed Potatoes"],
+        )
+
+    def test_description_groups_with_emoji_headings(self):
+        self.assertEqual(
+            parse_day(REAL_LUNCH).formatted_description,
+            "🍽️ Entrees:\n• Peanut Butter & Jelly Sandwich\n• Salisbury Steak\n• Pepperoni Pizza\n• Egg Chef Salad"
+            "\n\n🥖 Sides:\n• Fresh Baked Breadstick\n• Dinner Roll"
+            "\n\n🍎 Fruit:\n• Red Delicious Apple"
+            "\n\n🥦 Vegetables:\n• Mashed Potatoes"
+            "\n\n🥛 Beverages:\n• Fruit Juice\n• 1% Milk",
+        )
+
+    def test_event_title_lists_only_entrees_with_emoji(self):
+        self.assertEqual(
+            parse_day(REAL_LUNCH).calendar_summary("Lunch"),
+            "🍽️ Lunch: Peanut Butter & Jelly Sandwich, Salisbury Steak, Pepperoni Pizza, Egg Chef Salad",
+        )
+
+    def test_salad_depends_on_section(self):
+        self.assertEqual(classify_item("salad", "express"), "entree")
+        self.assertEqual(classify_item("salad", "vegetable"), "side")
+
+    def test_section_decides_when_category_is_missing(self):
+        self.assertEqual(classify_item("", "entree"), "entree")
+        self.assertEqual(classify_item("", "milk"), "beverage")
+        self.assertEqual(classify_item("", "condiments"), "condiment")
+        self.assertEqual(classify_item("", "fruit"), "side")
+
+    def test_menu_emoji(self):
+        self.assertEqual(calendar_title_prefix("Lunch"), "🍽️ Lunch: ")
+        self.assertEqual(calendar_title_prefix("Preschool Breakfast"), "🥞 Preschool Breakfast: ")
+        self.assertEqual(calendar_title_prefix("After School Snack Menu"), "🍪 After School Snack Menu: ")
 
 
 if __name__ == "__main__":

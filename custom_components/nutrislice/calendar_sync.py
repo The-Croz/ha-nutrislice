@@ -21,7 +21,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_SYNC_CALENDAR, LOGGER
-from .coordinator import NutrisliceCoordinator, NutrisliceMenuData, ParsedDayMenu
+from .coordinator import (
+    NutrisliceCoordinator,
+    NutrisliceMenuData,
+    ParsedDayMenu,
+    calendar_title_prefix,
+)
 
 
 async def async_sync_entry(
@@ -118,12 +123,16 @@ def _is_synced(
     """Return True if this meal is already on the calendar.
 
     Matches on day, school, and menu name rather than the full title, so a meal
-    whose entrees changed after syncing isn't duplicated.
+    whose entrees changed after syncing isn't duplicated. Titles from before
+    1.4.0 had no emoji ("Lunch: ..."), and still count.
     """
-    title_prefix = f"{menu.menu_type_name}: "
+    title_prefixes = (
+        calendar_title_prefix(menu.menu_type_name),
+        f"{menu.menu_type_name}: ",
+    )
     return any(
         str(event.get("start", ""))[:10] == day.date_str
         and event.get("location") == menu.school_name
-        and str(event.get("summary", "")).startswith(title_prefix)
+        and str(event.get("summary", "")).startswith(title_prefixes)
         for event in existing
     )
