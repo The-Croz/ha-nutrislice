@@ -9,7 +9,7 @@
           "district": "Or search by district name"
         },
         "data_description": {
-          "link": "For example https://my-district.nutrislice.com/menu/my-school/lunch",
+          "link": "For example {example_url}",
           "district": "For example Souderton or Fairfax County Public Schools. Only works when the district's web address resembles its name."
         }
       },

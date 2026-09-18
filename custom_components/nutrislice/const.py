@@ -19,6 +19,8 @@ CONF_SYNC_CALENDAR: Final = "sync_calendar"
 SERVICE_SYNC_CALENDAR: Final = "sync_calendar"
 
 LOOKUP_URL: Final = "https://lookup.nutrislice.com"
+# Shown as a placeholder: hassfest forbids literal URLs inside translation strings
+EXAMPLE_MENU_URL: Final = "https://my-district.nutrislice.com/menu/my-school/lunch"
 
 DEFAULT_SCAN_INTERVAL_HOURS: Final = 4
 DEFAULT_UPCOMING_WEEKS: Final = 2

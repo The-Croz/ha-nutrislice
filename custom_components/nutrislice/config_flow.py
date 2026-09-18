@@ -29,6 +29,7 @@ from .const import (
     DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DEFAULT_SCAN_INTERVAL_HOURS,
     DOMAIN,
+    EXAMPLE_MENU_URL,
     LOGGER,
     LOOKUP_URL,
 )
@@ -121,7 +122,10 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"lookup_url": LOOKUP_URL},
+            description_placeholders={
+                "lookup_url": LOOKUP_URL,
+                "example_url": EXAMPLE_MENU_URL,
+            },
         )
 
     async def async_step_school(
