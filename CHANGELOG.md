@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.2] - 2026-09-18
+
+### Changed
+- Restored the fuller README layout (emoji section headings, installation options, setup details, calendar sync notes), keeping the corrected examples from 1.3.1.
+
 ## [1.3.1] - 2026-09-18
 
 ### Fixed
