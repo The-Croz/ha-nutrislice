@@ -12,7 +12,7 @@ View upcoming meals on a Home Assistant calendar, show today's and tomorrow's me
 
 ## ✨ Features
 
-- 🔍 **Universal School & District Search:** Works for any school using Nutrislice. Enter your school district slug or simply paste any URL from your school's Nutrislice website. The integration automatically discovers your school and all available meal menus.
+- 🔍 **Search by Name:** Works for any school using Nutrislice. Type your district's name (e.g. `Fairfax County Public Schools`) and pick your school from the results, or paste a link from your school's Nutrislice website. The integration then discovers all available meal menus.
 - 📅 **Native Calendar Platform:** Generates all-day calendar events for each school day with entrees, sides, and beverages, directly on your Home Assistant calendar.
 - 🔄 **Calendar Sync:** Optionally copy upcoming meals into any writable calendar (Local Calendar, Google Calendar, CalDAV, ...) so they appear alongside your other events on every device.
 - 🍽️ **Smart Sensors:**
@@ -50,12 +50,20 @@ The integration includes an interactive UI setup flow to find your school:
 1. In Home Assistant, navigate to **Settings** > **Devices & Services**.
 2. Click **+ Add Integration** and search for **Nutrislice**.
 3. Follow the setup wizard:
-   - **Step 1 (District Discovery):** 
-     - Enter your district subdomain (e.g. `mydistrict` for `mydistrict.nutrislice.com`)
-     - **OR** simply paste any link from your school's menu website (e.g. `https://mydistrict.nutrislice.com/menu/my-school/lunch`). The setup wizard will automatically parse the district and school from the link!
-   - **Step 2 (School Selection):** Select your school from the dropdown list of schools found in that district.
+   - **Step 1 (Find Your District):** Enter any of these:
+     - Your **district's name**, e.g. `Souderton`, `Austin ISD`, or `Fairfax County Public Schools`. Every matching district is searched and its schools are listed in the next step.
+     - Your district's **Nutrislice address**, e.g. `mydistrict.nutrislice.com`.
+     - **Any link** from your school's menu website, e.g. `https://mydistrict.nutrislice.com/menu/my-school/lunch`. A link that includes your school skips straight to Step 3.
+   - **Step 2 (School Selection):** Select your school from the list of schools found. If the search matched more than one district, each school is labelled with its district so you can pick the right one.
    - **Step 3 (Menu Types):** Select which meal menus you want to track (e.g. `Lunch`, `Breakfast`, `Snack`).
 4. Click **Submit**. Your school device, sensors, and calendar entities will be automatically created!
+
+### If your district isn't found
+
+Nutrislice doesn't publish a searchable directory of districts, so a name search works by checking the web addresses districts commonly use (for example `name`, `namesd`, `nameschools`, or initials like `fcps`). It finds most districts, but not those with an unrelated address. If nothing matches:
+
+- Try a shorter name, such as just the town or the main word in the district's name.
+- Otherwise, use [Nutrislice Lookup](https://lookup.nutrislice.com) to find your school. It opens your school's menu page, and you can paste that page's address into Step 1.
 
 ---
 

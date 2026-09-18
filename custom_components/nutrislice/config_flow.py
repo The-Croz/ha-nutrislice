@@ -14,9 +14,8 @@ from homeassistant.helpers import selector
 
 from .api import (
     CannotConnect,
-    InvalidDistrict,
     NutrisliceApiClient,
-    NutrisliceError,
+    candidate_districts,
     parse_nutrislice_url_or_slug,
 )
 from .const import (
@@ -31,6 +30,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_HOURS,
     DOMAIN,
     LOGGER,
+    LOOKUP_URL,
 )
 
 
@@ -42,50 +42,56 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize flow."""
         self._district: str = ""
-        self._schools: list[dict[str, Any]] = []
+        # Every district the search matched, with its schools
+        self._schools_by_district: dict[str, list[dict[str, Any]]] = {}
         self._selected_school: dict[str, Any] = {}
         self._preselected_menu_type: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Step 1: Input district name or Nutrislice menu URL."""
+        """Step 1: Search by district name, or enter a district slug/Nutrislice link."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             raw_input = user_input.get(CONF_DISTRICT, "").strip()
-            district, school_slug, menu_type_slug = parse_nutrislice_url_or_slug(raw_input)
+            is_link = "nutrislice.com" in raw_input.lower() or "://" in raw_input
+            link_district, school_slug, menu_type_slug = parse_nutrislice_url_or_slug(raw_input)
 
-            if not district:
+            # A link names its district exactly; anything else is a name to search
+            if is_link:
+                candidates = [link_district] if link_district else []
+            else:
+                candidates = candidate_districts(raw_input)
+
+            if not candidates:
                 errors["base"] = "invalid_district"
             else:
-                session = async_get_clientsession(self.hass)
-                client = NutrisliceApiClient(session)
+                client = NutrisliceApiClient(async_get_clientsession(self.hass))
                 try:
-                    schools = await client.async_get_schools(district)
-                    if not schools:
-                        errors["base"] = "no_schools_found"
-                    else:
-                        self._district = district
-                        self._schools = schools
-                        self._preselected_menu_type = menu_type_slug
-
-                        # If user pasted a full URL with a school, check if it matches
-                        if school_slug:
-                            for s in schools:
-                                if s.get("slug") == school_slug:
-                                    self._selected_school = s
-                                    return await self.async_step_menu_types()
-
-                        return await self.async_step_school()
-
-                except InvalidDistrict:
-                    errors["base"] = "invalid_district"
+                    found = await client.async_find_districts(candidates)
                 except CannotConnect:
                     errors["base"] = "cannot_connect"
                 except Exception as err:
                     LOGGER.exception("Unexpected error in Nutrislice setup: %s", err)
                     errors["base"] = "unknown"
+                else:
+                    if not found:
+                        errors["base"] = "invalid_district" if is_link else "no_districts_found"
+                    else:
+                        self._schools_by_district = found
+                        self._preselected_menu_type = menu_type_slug
+
+                        # A pasted school link goes straight to menu selection
+                        if school_slug and len(found) == 1:
+                            district, schools = next(iter(found.items()))
+                            for school in schools:
+                                if school.get("slug") == school_slug:
+                                    self._district = district
+                                    self._selected_school = school
+                                    return await self.async_step_menu_types()
+
+                        return await self.async_step_school()
 
         schema = vol.Schema(
             {
@@ -102,34 +108,40 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=schema,
             errors=errors,
+            description_placeholders={"lookup_url": LOOKUP_URL},
         )
 
     async def async_step_school(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Step 2: Select school from district list."""
+        """Step 2: Select the school from every district the search matched."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            selected_slug = user_input.get(CONF_SCHOOL_SLUG)
-            for s in self._schools:
-                if s.get("slug") == selected_slug:
-                    self._selected_school = s
+            district, _, school_slug = user_input.get(CONF_SCHOOL_SLUG, "").partition("/")
+            for school in self._schools_by_district.get(district, []):
+                if school.get("slug") == school_slug:
+                    self._district = district
+                    self._selected_school = school
                     return await self.async_step_menu_types()
             errors["base"] = "school_not_found"
 
-        # Build dropdown options
+        # Name the district next to each school only when several matched
+        multiple_districts = len(self._schools_by_district) > 1
         school_options = [
             selector.SelectOptionDict(
-                value=s.get("slug", ""),
-                label=s.get("name", s.get("slug", "")),
+                value=f"{district}/{school['slug']}",
+                label=(
+                    f"{school.get('name', school['slug'])} ({district})"
+                    if multiple_districts
+                    else school.get("name", school["slug"])
+                ),
             )
-            for s in self._schools
-            if s.get("slug")
+            for district, schools in self._schools_by_district.items()
+            for school in schools
+            if school.get("slug")
         ]
-
-        # Sort alphabetically by label
-        school_options.sort(key=lambda x: x["label"].lower())
+        school_options.sort(key=lambda option: option["label"].lower())
 
         schema = vol.Schema(
             {
@@ -149,7 +161,10 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="school",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"district": self._district},
+            description_placeholders={
+                "count": str(len(school_options)),
+                "districts": ", ".join(self._schools_by_district),
+            },
         )
 
     async def async_step_menu_types(

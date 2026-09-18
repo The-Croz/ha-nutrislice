@@ -17,6 +17,8 @@ CONF_SYNC_CALENDAR: Final = "sync_calendar"
 
 SERVICE_SYNC_CALENDAR: Final = "sync_calendar"
 
+LOOKUP_URL: Final = "https://lookup.nutrislice.com"
+
 DEFAULT_SCAN_INTERVAL_HOURS: Final = 4
 DEFAULT_UPCOMING_WEEKS: Final = 2
 DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND: Final = True

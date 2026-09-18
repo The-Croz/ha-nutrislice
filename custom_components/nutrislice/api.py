@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date, timedelta
-import logging
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -13,6 +12,26 @@ import aiohttp
 from .const import LOGGER
 
 TIMEOUT = aiohttp.ClientTimeout(total=15)
+# Any HTTP response from this host proves the network works (used to tell an
+# unknown district apart from being offline).
+REACHABILITY_URL = "https://api.nutrislice.com/"
+MAX_DISTRICT_CANDIDATES = 16
+MAX_CONCURRENT_LOOKUPS = 6
+
+# Words that describe *what* a district is rather than *which* one it is.
+GENERIC_NAME_WORDS = frozenset(
+    {
+        "the", "of", "and", "for", "school", "schools", "district", "public",
+        "county", "city", "unified", "independent", "community", "consolidated",
+        "area", "regional", "academy", "academies", "charter", "department",
+        "education", "board", "system", "elementary", "middle", "high", "junior",
+        "senior", "primary", "central",
+    }
+)
+# Common ways districts turn their name into a Nutrislice subdomain
+# (e.g. "soudertonsd", "austinisd", "mcsin-k12", "a2schools").
+DISTRICT_SLUG_SUFFIXES = ("sd", "schools", "isd", "usd", "csd", "cusd", "psd", "ps")
+DISTRICT_SLUG_HYPHENATED_SUFFIXES = ("k12", "sd", "schools")
 DEFAULT_HEADERS = {
     "User-Agent": "HomeAssistant-Nutrislice/1.0",
     "Accept": "application/json",
@@ -37,6 +56,14 @@ class SchoolNotFound(NutrisliceError):
 
 class MenuNotFound(NutrisliceError):
     """Exception to indicate menu was not found."""
+
+
+class DistrictUnreachable(CannotConnect):
+    """A district's hostname could not be reached.
+
+    Either the district doesn't exist (its subdomain has no DNS record) or the
+    network is down; callers tell the two apart with a reachability check.
+    """
 
 
 def parse_nutrislice_url_or_slug(input_str: str) -> tuple[str, str | None, str | None]:
@@ -98,6 +125,39 @@ def parse_nutrislice_url_or_slug(input_str: str) -> tuple[str, str | None, str |
     return district, None, None
 
 
+def candidate_districts(query: str) -> list[str]:
+    """Return likely district subdomains for a free-text name, best guess first.
+
+    Nutrislice has no public district search, so names are turned into the
+    slugs districts commonly use and each one is checked against the API.
+    "Fairfax County Public Schools" yields ``fairfax``, ``fcps``,
+    ``fairfaxsd``, ``fairfax-k12``, ...
+    """
+    tokens = re.findall(r"[a-z0-9]+", query.lower())
+    if not tokens:
+        return []
+
+    stem_tokens = [t for t in tokens if t not in GENERIC_NAME_WORDS] or tokens
+    stem = "".join(stem_tokens)
+
+    candidates = ["".join(tokens), "-".join(tokens), stem]
+
+    # Initials, e.g. "Fairfax County Public Schools" -> "fcps"
+    if 2 < len(tokens) <= 6:
+        candidates.append("".join(t[0] for t in tokens))
+
+    # "District 211" -> "d211" / "district211" / "sd211"
+    numbers = [t for t in tokens if t.isdigit()]
+    if numbers:
+        candidates += [f"d{numbers[0]}", f"district{numbers[0]}", f"sd{numbers[0]}"]
+
+    candidates += [f"{stem}{suffix}" for suffix in DISTRICT_SLUG_SUFFIXES]
+    candidates += [f"{stem}-{suffix}" for suffix in DISTRICT_SLUG_HYPHENATED_SUFFIXES]
+
+    unique = list(dict.fromkeys(c for c in candidates if c))
+    return unique[:MAX_DISTRICT_CANDIDATES]
+
+
 class NutrisliceApiClient:
     """Nutrislice API client."""
 
@@ -118,12 +178,8 @@ class NutrisliceApiClient:
         if self._own_session and self._session and not self._session.closed:
             await self._session.close()
 
-    async def async_get_schools(self, district: str) -> list[dict[str, Any]]:
-        """Fetch all schools in a district."""
-        district = district.strip().lower()
-        if not district:
-            raise InvalidDistrict("District cannot be empty")
-
+    async def _async_fetch_schools(self, district: str) -> list[dict[str, Any]]:
+        """Fetch a district's schools without judging connection failures."""
         url = f"https://{district}.api.nutrislice.com/menu/api/schools/"
         session = await self._get_session()
 
@@ -141,9 +197,71 @@ class NutrisliceApiClient:
                     raise CannotConnect("Unexpected API response format: expected school list")
                 return data
 
-        except (aiohttp.ClientConnectorError, aiohttp.ClientError, asyncio.TimeoutError) as err:
-            LOGGER.error("Connection error reaching Nutrislice for district %s: %s", district, err)
+        except aiohttp.ClientConnectorError as err:
+            raise DistrictUnreachable(f"Could not reach {district}: {err}") from err
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise CannotConnect(f"Failed to connect to Nutrislice: {err}") from err
+
+    async def _async_is_online(self) -> bool:
+        """Return True if Nutrislice's API host answers at all."""
+        session = await self._get_session()
+        try:
+            async with session.get(REACHABILITY_URL):
+                return True
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            return False
+
+    async def async_get_schools(self, district: str) -> list[dict[str, Any]]:
+        """Fetch all schools in a district."""
+        district = district.strip().lower()
+        if not district:
+            raise InvalidDistrict("District cannot be empty")
+
+        try:
+            return await self._async_fetch_schools(district)
+        except DistrictUnreachable as err:
+            # An unknown district has no DNS record, which looks just like a
+            # connection failure; only report one if we're really offline.
+            if await self._async_is_online():
+                raise InvalidDistrict(f"District '{district}' not found") from err
+            raise
+
+    async def async_find_districts(
+        self, candidates: list[str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Check candidate district slugs and return the ones that exist.
+
+        Returns a mapping of district slug to its schools (empty if none exist).
+        Raises CannotConnect only when nothing was found *and* Nutrislice could
+        not be reached, so "no such district" is never reported as an outage.
+        """
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_LOOKUPS)
+
+        async def probe(district: str) -> tuple[list[dict[str, Any]] | None, NutrisliceError | None]:
+            async with semaphore:
+                try:
+                    return await self._async_fetch_schools(district), None
+                except InvalidDistrict:
+                    return None, None
+                except NutrisliceError as err:
+                    return None, err
+
+        results = await asyncio.gather(*(probe(c) for c in candidates))
+
+        found = {
+            district: schools
+            for district, (schools, _) in zip(candidates, results)
+            if schools
+        }
+        if found:
+            return found
+
+        errors = [err for _, err in results if err is not None]
+        if any(not isinstance(err, DistrictUnreachable) for err in errors):
+            raise next(err for err in errors if not isinstance(err, DistrictUnreachable))
+        if errors and not await self._async_is_online():
+            raise errors[0]
+        return {}
 
     async def async_get_school(self, district: str, school_slug: str) -> dict[str, Any]:
         """Fetch a specific school by slug."""

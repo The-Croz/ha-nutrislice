@@ -2,15 +2,15 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Nutrislice",
-        "description": "Enter your school district name/slug (e.g. my-district) or paste your school's Nutrislice webpage address (e.g. my-district.nutrislice.com).",
+        "title": "Find Your School District",
+        "description": "Enter your school district's name (for example Souderton or Fairfax County Public Schools), its Nutrislice address (for example my-district.nutrislice.com), or paste any link from your school's Nutrislice menu.\n\nNot sure? Find your school with [Nutrislice Lookup]({lookup_url}) and paste the page address it opens.",
         "data": {
-          "district": "District Name or Nutrislice Address"
+          "district": "District name or Nutrislice link"
         }
       },
       "school": {
         "title": "Select School",
-        "description": "Found schools for district {district}. Select your school:",
+        "description": "Found {count} school(s) in: {districts}. Select your school. If it isn't listed, start over and try a different search, or paste a link from your school's Nutrislice menu.",
         "data": {
           "school_slug": "School"
         }
@@ -25,11 +25,11 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to Nutrislice servers.",
-      "invalid_district": "Could not find a valid Nutrislice district.",
-      "no_schools_found": "No schools found for this district.",
+      "invalid_district": "Could not find a valid Nutrislice district. Check the link or try searching by name.",
       "school_not_found": "Selected school was not found.",
       "no_menu_types_selected": "Please select at least one meal menu to track.",
-      "unknown": "An unexpected error occurred."
+      "unknown": "An unexpected error occurred.",
+      "no_districts_found": "No Nutrislice district matched that name. Try a shorter name (for example just the town), or find your school with Nutrislice Lookup and paste the link it opens."
     },
     "abort": {
       "already_configured": "This school is already configured in Home Assistant."
