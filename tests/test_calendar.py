@@ -90,6 +90,22 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[0].summary, "Lunch: Cheeseburger, Cheese Pizza")
         self.assertEqual(events[1].summary, "Lunch: Chicken Wings")
 
+    async def test_async_get_events_end_is_exclusive(self):
+        """A day starting exactly at the (exclusive) range end is not returned."""
+        start_dt = datetime.combine(self.today_date, datetime.min.time())
+        end_dt = datetime.combine(self.today_date + timedelta(days=2), datetime.min.time())
+
+        events = await self.calendar.async_get_events(None, start_dt, end_dt)
+        self.assertEqual([e.summary for e in events], ["Lunch: Cheeseburger, Cheese Pizza"])
+
+    async def test_async_get_events_excludes_days_before_range(self):
+        """Days that end before the range starts are not returned."""
+        start_dt = datetime.combine(self.today_date + timedelta(days=1), datetime.min.time())
+        end_dt = datetime.combine(self.today_date + timedelta(days=7), datetime.min.time())
+
+        events = await self.calendar.async_get_events(None, start_dt, end_dt)
+        self.assertEqual([e.summary for e in events], ["Lunch: Chicken Wings"])
+
 
 if __name__ == "__main__":
     unittest.main()

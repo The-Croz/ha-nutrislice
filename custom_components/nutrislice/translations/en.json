@@ -41,9 +41,19 @@
         "title": "Nutrislice Configuration",
         "data": {
           "scan_interval_hours": "Update Interval (hours)",
-          "next_school_day_on_weekend": "Show next school day menu on weekends for 'Tomorrow' sensor"
+          "next_school_day_on_weekend": "Show next school day menu on weekends for 'Tomorrow' sensor",
+          "sync_calendar": "Sync menus to calendar"
+        },
+        "data_description": {
+          "sync_calendar": "Optional. Copy upcoming meals as all-day events into another calendar, such as a Local Calendar or Google Calendar. Leave empty to turn off. Events already synced are not changed or removed."
         }
       }
+    }
+  },
+  "services": {
+    "sync_calendar": {
+      "name": "Sync calendar",
+      "description": "Copy upcoming meals into each school's configured sync calendar now, instead of waiting for the next menu update."
     }
   }
 }

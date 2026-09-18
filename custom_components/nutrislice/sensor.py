@@ -1,7 +1,6 @@
 """Sensor platform for Nutrislice."""
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
@@ -10,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_CATEGORIES,
@@ -37,18 +37,15 @@ async def async_setup_entry(
     """Set up Nutrislice sensors from a config entry."""
     coordinator: NutrisliceCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities: list[SensorEntity] = []
-
-    for menu_type_slug, menu_data in coordinator.data.items():
-        entities.extend(
-            [
-                NutrisliceTodayMenuSensor(coordinator, entry, menu_type_slug),
-                NutrisliceTomorrowMenuSensor(coordinator, entry, menu_type_slug),
-                NutrisliceFullMenuSensor(coordinator, entry, menu_type_slug),
-            ]
+    async_add_entities(
+        sensor_class(coordinator, entry, menu_type_slug)
+        for menu_type_slug in coordinator.data
+        for sensor_class in (
+            NutrisliceTodayMenuSensor,
+            NutrisliceTomorrowMenuSensor,
+            NutrisliceFullMenuSensor,
         )
-
-    async_add_entities(entities)
+    )
 
 
 class NutrisliceBaseSensor(CoordinatorEntity[NutrisliceCoordinator], SensorEntity):
@@ -121,7 +118,7 @@ class NutrisliceTodayMenuSensor(NutrisliceBaseSensor):
         """Return attributes for today's menu."""
         if not self.menu_data or not self.menu_data.today:
             return {
-                ATTR_DATE: date.today().isoformat(),
+                ATTR_DATE: dt_util.now().date().isoformat(),
                 ATTR_ENTREES: [],
                 ATTR_SIDES: [],
                 ATTR_MENU_ITEMS: [],
@@ -184,7 +181,7 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
         )
 
         tomorrow = self.menu_data.tomorrow
-        if tomorrow and tomorrow.has_menu and tomorrow.entrees:
+        if tomorrow and tomorrow.has_entrees:
             return tomorrow, False
 
         # If tomorrow is empty or weekend, fall back to next school day if configured
@@ -262,7 +259,7 @@ class NutrisliceFullMenuSensor(NutrisliceBaseSensor):
     @property
     def native_value(self) -> str:
         """Return current date to match legacy sensor value_template (value_json.date)."""
-        return date.today().isoformat()
+        return dt_util.now().date().isoformat()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

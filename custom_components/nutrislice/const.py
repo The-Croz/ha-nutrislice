@@ -11,10 +11,11 @@ CONF_DISTRICT: Final = "district"
 CONF_SCHOOL_SLUG: Final = "school_slug"
 CONF_SCHOOL_NAME: Final = "school_name"
 CONF_MENU_TYPES: Final = "menu_types"
-CONF_MENU_TYPE: Final = "menu_type"
-CONF_MENU_TYPE_NAME: Final = "menu_type_name"
 CONF_SCAN_INTERVAL_HOURS: Final = "scan_interval_hours"
 CONF_NEXT_SCHOOL_DAY_ON_WEEKEND: Final = "next_school_day_on_weekend"
+CONF_SYNC_CALENDAR: Final = "sync_calendar"
+
+SERVICE_SYNC_CALENDAR: Final = "sync_calendar"
 
 DEFAULT_SCAN_INTERVAL_HOURS: Final = 4
 DEFAULT_UPCOMING_WEEKS: Final = 2
@@ -30,7 +31,6 @@ ATTR_SCHOOL_NAME: Final = "school_name"
 ATTR_MENU_TYPE: Final = "menu_type"
 ATTR_DISTRICT: Final = "district"
 ATTR_LAST_UPDATED: Final = "last_updated"
-ATTR_NUTRITION: Final = "nutrition"
 
 # Entree category tags & section keywords for classifying items
 ENTREE_FOOD_CATEGORIES: Final = {

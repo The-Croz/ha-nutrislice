@@ -1,8 +1,7 @@
 """Calendar platform for Nutrislice."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-import logging
+from datetime import datetime, timedelta
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
@@ -10,11 +9,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import NutrisliceCoordinator, NutrisliceMenuData, ParsedDayMenu
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -25,14 +23,10 @@ async def async_setup_entry(
     """Set up Nutrislice calendar entities from a config entry."""
     coordinator: NutrisliceCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities: list[NutrisliceCalendarEntity] = []
-
-    for menu_type_slug, menu_data in coordinator.data.items():
-        entities.append(
-            NutrisliceCalendarEntity(coordinator, entry, menu_type_slug)
-        )
-
-    async_add_entities(entities)
+    async_add_entities(
+        NutrisliceCalendarEntity(coordinator, entry, menu_type_slug)
+        for menu_type_slug in coordinator.data
+    )
 
 
 class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], CalendarEntity):
@@ -83,7 +77,7 @@ class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], Calenda
         return CalendarEvent(
             start=day.target_date,
             end=day.target_date + timedelta(days=1),
-            summary=f"{menu_name}: {day.summary}",
+            summary=day.calendar_summary(menu_name),
             description=day.formatted_description,
             location=self.coordinator.school_name,
         )
@@ -94,21 +88,14 @@ class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], Calenda
         if not self.menu_data:
             return None
 
-        today_date = date.today()
-        today_str = today_date.isoformat()
+        today_str = dt_util.now().date().isoformat()
 
-        # Check today first
-        if today_str in self.menu_data.days_by_date:
-            today_day = self.menu_data.days_by_date[today_str]
-            if today_day.has_menu and today_day.entrees:
-                return self._day_to_event(today_day)
-
-        # Look for the next upcoming day with a menu
-        for d_str in sorted(self.menu_data.days_by_date.keys()):
-            if d_str >= today_str:
-                day = self.menu_data.days_by_date[d_str]
-                if day.has_menu and day.entrees:
-                    return self._day_to_event(day)
+        # ISO date strings sort chronologically, so the first match is the
+        # current day's meal or, failing that, the next upcoming one.
+        for d_str in sorted(self.menu_data.days_by_date):
+            day = self.menu_data.days_by_date[d_str]
+            if d_str >= today_str and day.has_entrees:
+                return self._day_to_event(day)
 
         return None
 
@@ -118,18 +105,18 @@ class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], Calenda
         start_date: datetime,
         end_date: datetime,
     ) -> list[CalendarEvent]:
-        """Return calendar events within a datetime range."""
+        """Return calendar events overlapping the requested range.
+
+        ``end_date`` is exclusive, so a day starting exactly at ``end_date``
+        is outside the range.
+        """
         if not self.menu_data:
             return []
 
-        start_d = start_date.date() if isinstance(start_date, datetime) else start_date
-        end_d = end_date.date() if isinstance(end_date, datetime) else end_date
-
-        events: list[CalendarEvent] = []
-
-        for day in self.menu_data.days_by_date.values():
-            if start_d <= day.target_date <= end_d:
-                if day.has_menu and day.entrees:
-                    events.append(self._day_to_event(day))
-
-        return events
+        return [
+            self._day_to_event(day)
+            for day in self.menu_data.days_by_date.values()
+            if day.has_entrees
+            and dt_util.start_of_local_day(day.target_date) < end_date
+            and dt_util.start_of_local_day(day.target_date + timedelta(days=1)) > start_date
+        ]

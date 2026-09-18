@@ -1,27 +1,25 @@
 """DataUpdateCoordinator for Nutrislice."""
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import NutrisliceApiClient, NutrisliceError
 from .const import (
     CONF_DISTRICT,
     CONF_MENU_TYPES,
-    CONF_NEXT_SCHOOL_DAY_ON_WEEKEND,
     CONF_SCAN_INTERVAL_HOURS,
     CONF_SCHOOL_NAME,
     CONF_SCHOOL_SLUG,
-    DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DEFAULT_SCAN_INTERVAL_HOURS,
     DEFAULT_UPCOMING_WEEKS,
-    DOMAIN,
     ENTREE_FOOD_CATEGORIES,
     ENTREE_SECTION_KEYWORDS,
     IGNORE_SECTION_KEYWORDS,
@@ -61,9 +59,14 @@ class ParsedDayMenu:
     raw_day: dict[str, Any] = field(default_factory=dict)
 
     @property
+    def has_entrees(self) -> bool:
+        """Return True if the day has a published menu with at least one entree."""
+        return self.has_menu and bool(self.entrees)
+
+    @property
     def summary(self) -> str:
         """Return clean summary of entrees for state display (capped at 255 chars)."""
-        if not self.has_menu or not self.entrees:
+        if not self.has_entrees:
             return "No Menu Scheduled"
         text = ", ".join(self.entrees)
         if len(text) > 250:
@@ -75,12 +78,16 @@ class ParsedDayMenu:
         """Formatted description suitable for calendar events or notifications."""
         lines: list[str] = []
         if self.entrees:
-            lines.append(f"🍽️ Entrees:\n• " + "\n• ".join(self.entrees))
+            lines.append("🍽️ Entrees:\n• " + "\n• ".join(self.entrees))
         if self.sides:
-            lines.append(f"🥗 Sides & Fruits:\n• " + "\n• ".join(self.sides))
+            lines.append("🥗 Sides & Fruits:\n• " + "\n• ".join(self.sides))
         if self.beverages:
-            lines.append(f"🥛 Beverages:\n• " + "\n• ".join(self.beverages))
+            lines.append("🥛 Beverages:\n• " + "\n• ".join(self.beverages))
         return "\n\n".join(lines) if lines else "No menu items published."
+
+    def calendar_summary(self, menu_name: str) -> str:
+        """Return the calendar event title, e.g. "Lunch: Cheeseburger, Pizza"."""
+        return f"{menu_name}: {self.summary}"
 
 
 @dataclass
@@ -106,7 +113,7 @@ def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
     try:
         t_date = date.fromisoformat(date_str)
     except (ValueError, TypeError):
-        t_date = date.today()
+        t_date = dt_util.now().date()
 
     is_holiday = bool(raw_day.get("is_holiday", False))
     raw_menu_items = raw_day.get("menu_items", []) or []
@@ -238,6 +245,8 @@ class NutrisliceCoordinator(DataUpdateCoordinator[dict[str, NutrisliceMenuData]]
         self.school_slug: str = entry.data[CONF_SCHOOL_SLUG]
         self.school_name: str = entry.data.get(CONF_SCHOOL_NAME, self.school_slug)
         self.menu_types: list[dict[str, Any]] = entry.data.get(CONF_MENU_TYPES, [])
+        # Serializes pushes into the sync target calendar (see calendar_sync.py)
+        self.sync_lock = asyncio.Lock()
 
         scan_interval_hours = entry.options.get(
             CONF_SCAN_INTERVAL_HOURS,
@@ -254,8 +263,8 @@ class NutrisliceCoordinator(DataUpdateCoordinator[dict[str, NutrisliceMenuData]]
     async def _async_update_data(self) -> dict[str, NutrisliceMenuData]:
         """Fetch all menu types data from Nutrislice."""
         result: dict[str, NutrisliceMenuData] = {}
-        now = datetime.now()
-        today_date = date.today()
+        now = dt_util.now()
+        today_date = now.date()
         tomorrow_date = today_date + timedelta(days=1)
         today_str = today_date.isoformat()
         tomorrow_str = tomorrow_date.isoformat()
@@ -287,15 +296,15 @@ class NutrisliceCoordinator(DataUpdateCoordinator[dict[str, NutrisliceMenuData]]
             today_menu = days_by_date.get(today_str)
             tomorrow_menu = days_by_date.get(tomorrow_str)
 
-            # Determine next school day if tomorrow has no menu or is weekend
-            next_school_day: ParsedDayMenu | None = None
-            sorted_dates = sorted(days_by_date.keys())
-            for d_str in sorted_dates:
-                if d_str >= today_str:
-                    day_obj = days_by_date[d_str]
-                    if day_obj.has_menu and day_obj.entrees:
-                        if d_str > today_str and next_school_day is None:
-                            next_school_day = day_obj
+            # First day after today with a menu (fallback for weekends/holidays)
+            next_school_day = next(
+                (
+                    days_by_date[d_str]
+                    for d_str in sorted(days_by_date)
+                    if d_str > today_str and days_by_date[d_str].has_entrees
+                ),
+                None,
+            )
 
             result[menu_type_slug] = NutrisliceMenuData(
                 district=self.district,

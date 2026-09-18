@@ -26,6 +26,7 @@ from .const import (
     CONF_SCAN_INTERVAL_HOURS,
     CONF_SCHOOL_NAME,
     CONF_SCHOOL_SLUG,
+    CONF_SYNC_CALENDAR,
     DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DEFAULT_SCAN_INTERVAL_HOURS,
     DOMAIN,
@@ -246,15 +247,11 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> NutrisliceOptionsFlowHandler:
         """Get options flow for this entry."""
-        return NutrisliceOptionsFlowHandler(config_entry)
+        return NutrisliceOptionsFlowHandler()
 
 
 class NutrisliceOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Nutrislice options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -289,6 +286,24 @@ class NutrisliceOptionsFlowHandler(config_entries.OptionsFlow):
                         DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
                     ),
                 ): selector.BooleanSelector(),
+                # suggested_value (not default) so the field can be cleared
+                vol.Optional(
+                    CONF_SYNC_CALENDAR,
+                    description={
+                        "suggested_value": self.config_entry.options.get(
+                            CONF_SYNC_CALENDAR
+                        )
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        filter=selector.EntityFilterSelectorConfig(
+                            domain="calendar",
+                            supported_features=[
+                                "calendar.CalendarEntityFeature.CREATE_EVENT"
+                            ],
+                        )
+                    )
+                ),
             }
         )
 

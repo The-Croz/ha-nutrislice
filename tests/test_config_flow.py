@@ -97,21 +97,29 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["data"]["menu_types"], [{"slug": "lunch", "name": "Lunch"}])
 
     async def test_options_flow(self):
-        """Test options flow allows changing scan interval and weekend preference."""
+        """Test options flow allows changing scan interval, weekend preference, and sync calendar."""
         entry = MockConfigEntry(
             data={"district": "sample-district", "school_slug": "lincoln-elementary"},
             options={"scan_interval_hours": 4},
         )
-        opt_flow = NutrisliceOptionsFlowHandler(entry)
+        opt_flow = NutrisliceOptionsFlowHandler()
+        opt_flow.config_entry = entry
 
         # Show form
         res_form = await opt_flow.async_step_init(None)
         self.assertEqual(res_form["type"], "form")
 
         # Submit change
-        res_submit = await opt_flow.async_step_init({"scan_interval_hours": 6, "next_school_day_on_weekend": True})
+        res_submit = await opt_flow.async_step_init(
+            {
+                "scan_interval_hours": 6,
+                "next_school_day_on_weekend": True,
+                "sync_calendar": "calendar.family",
+            }
+        )
         self.assertEqual(res_submit["type"], "create_entry")
         self.assertEqual(res_submit["data"]["scan_interval_hours"], 6)
+        self.assertEqual(res_submit["data"]["sync_calendar"], "calendar.family")
 
 
 if __name__ == "__main__":

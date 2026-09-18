@@ -1,4 +1,5 @@
 """Mock Home Assistant and dependency classes for self-contained testing."""
+from datetime import datetime, time
 import sys
 import types
 from typing import Any
@@ -18,6 +19,9 @@ class MockConfigEntry:
 
     def add_update_listener(self, func):
         return lambda: None
+
+    def async_create_background_task(self, hass, target, name):
+        target.close()
 
 
 class MockHomeAssistant:
@@ -60,8 +64,14 @@ class MockConfigFlow:
         pass
 
 
+class MockHomeAssistantError(Exception):
+    """Mock HomeAssistantError."""
+
+
 class MockOptionsFlow:
     """Mock OptionsFlow."""
+
+    config_entry = None  # provided by Home Assistant's flow manager at runtime
 
     def __init__(self, *args, **kwargs):
         pass
@@ -97,6 +107,10 @@ class MockDataUpdateCoordinator:
         self.name = name
         self.update_interval = update_interval
         self.data = {}
+        self.last_update_success = True
+
+    def async_add_listener(self, update_callback, context=None):
+        return lambda: None
 
     async def async_config_entry_first_refresh(self):
         self.data = await self._async_update_data()
@@ -196,6 +210,7 @@ def setup_ha_mocks():
     ha_core = types.ModuleType("homeassistant.core")
     ha_core.HomeAssistant = MockHomeAssistant
     ha_core.callback = callback
+    ha_core.ServiceCall = object
 
     ha_const = types.ModuleType("homeassistant.const")
     ha_const.Platform = MockPlatform
@@ -236,6 +251,24 @@ def setup_ha_mocks():
     ha_sel.NumberSelectorConfig = lambda *args, **kwargs: None
     ha_sel.NumberSelectorMode = types.SimpleNamespace(BOX="box")
     ha_sel.BooleanSelector = lambda *args, **kwargs: None
+    ha_sel.EntitySelector = lambda *args, **kwargs: None
+    ha_sel.EntitySelectorConfig = lambda *args, **kwargs: None
+    ha_sel.EntityFilterSelectorConfig = lambda *args, **kwargs: None
+
+    ha_exc = types.ModuleType("homeassistant.exceptions")
+    ha_exc.HomeAssistantError = MockHomeAssistantError
+
+    ha_cv = types.ModuleType("homeassistant.helpers.config_validation")
+    ha_cv.config_entry_only_config_schema = lambda domain: None
+
+    ha_typing = types.ModuleType("homeassistant.helpers.typing")
+    ha_typing.ConfigType = dict
+
+    ha_util = types.ModuleType("homeassistant.util")
+    ha_dt = types.ModuleType("homeassistant.util.dt")
+    ha_dt.now = datetime.now
+    ha_dt.start_of_local_day = lambda day: datetime.combine(day, time.min)
+    ha_util.dt = ha_dt
 
     ha_comp = types.ModuleType("homeassistant.components")
     ha_sensor = types.ModuleType("homeassistant.components.sensor")
@@ -244,6 +277,7 @@ def setup_ha_mocks():
     ha_calendar = types.ModuleType("homeassistant.components.calendar")
     ha_calendar.CalendarEntity = MockCalendarEntity
     ha_calendar.CalendarEvent = MockCalendarEvent
+    ha_calendar.DOMAIN = "calendar"
 
     # Voluptuous
     vol = types.ModuleType("voluptuous")
@@ -267,6 +301,13 @@ def setup_ha_mocks():
     ha_helpers.aiohttp_client = ha_aio
     sys.modules["homeassistant.helpers.selector"] = ha_sel
     ha_helpers.selector = ha_sel
+    sys.modules["homeassistant.helpers.config_validation"] = ha_cv
+    ha_helpers.config_validation = ha_cv
+    sys.modules["homeassistant.helpers.typing"] = ha_typing
+    ha_helpers.typing = ha_typing
+    sys.modules["homeassistant.exceptions"] = ha_exc
+    sys.modules["homeassistant.util"] = ha_util
+    sys.modules["homeassistant.util.dt"] = ha_dt
     sys.modules["homeassistant.components"] = ha_comp
     sys.modules["homeassistant.components.sensor"] = ha_sensor
     ha_comp.sensor = ha_sensor
