@@ -2,15 +2,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Find Your School District",
-        "description": "Enter your school district's name (for example Souderton or Fairfax County Public Schools), its Nutrislice address (for example my-district.nutrislice.com), or paste any link from your school's Nutrislice menu.\n\nNot sure? Find your school with [Nutrislice Lookup]({lookup_url}) and paste the page address it opens.",
+        "title": "Find Your School",
+        "description": "**Paste a link to your school's Nutrislice menu.** This is the most reliable way, because Nutrislice web addresses often don't match the district's name.\n\nDon't have the link? Open [Nutrislice Lookup]({lookup_url}), search for your school, open its menu page, then copy the address from your browser and paste it below.\n\nAlternatively, if you know your district's name, search for it instead.",
         "data": {
-          "district": "District name or Nutrislice link"
+          "link": "Link to your school's Nutrislice menu",
+          "district": "Or search by district name"
+        },
+        "data_description": {
+          "link": "For example https://my-district.nutrislice.com/menu/my-school/lunch",
+          "district": "For example Souderton or Fairfax County Public Schools. Only works when the district's web address resembles its name."
         }
       },
       "school": {
         "title": "Select School",
-        "description": "Found {count} school(s) in: {districts}. Select your school. If it isn't listed, start over and try a different search, or paste a link from your school's Nutrislice menu.",
+        "description": "Found {count} school(s) in {districts}. Select your school below.\n\nIf it isn't listed, go back and paste a link to your school's Nutrislice menu instead.",
         "data": {
           "school_slug": "School"
         }
@@ -24,12 +29,14 @@
       }
     },
     "error": {
+      "nothing_entered": "Enter a link to your school's Nutrislice menu, or a district name to search for.",
+      "invalid_link": "That doesn't look like a Nutrislice menu link, or the district in it no longer exists. Open your school's menu on Nutrislice and copy the address from your browser.",
+      "invalid_district": "Could not find a valid Nutrislice district.",
+      "no_districts_found": "No Nutrislice district matched that name. Many districts use a web address unrelated to their name, so try pasting a link to your school's menu instead.",
       "cannot_connect": "Failed to connect to Nutrislice servers.",
-      "invalid_district": "Could not find a valid Nutrislice district. Check the link or try searching by name.",
       "school_not_found": "Selected school was not found.",
       "no_menu_types_selected": "Please select at least one meal menu to track.",
-      "unknown": "An unexpected error occurred.",
-      "no_districts_found": "No Nutrislice district matched that name. Try a shorter name (for example just the town), or find your school with Nutrislice Lookup and paste the link it opens."
+      "unknown": "An unexpected error occurred."
     },
     "abort": {
       "already_configured": "This school is already configured in Home Assistant."

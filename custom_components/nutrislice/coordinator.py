@@ -107,6 +107,24 @@ class NutrisliceMenuData:
     last_updated: datetime
 
 
+def menu_entity_name(school_name: str, menu_name: str, suffix: str = "") -> str | None:
+    """Return an entity name that doesn't repeat what the device already says.
+
+    Home Assistant renders "<device name> <entity name>", and the device is the
+    school. A school whose name already ends with the menu type (for example
+    "Surf City Elementary Lunch") would otherwise read "... Lunch Lunch".
+    Returning None makes the entity simply take the device's name.
+    """
+    menu_name = menu_name.strip()
+    school_name = school_name.strip()
+    # Compare whole words, so "Deerlunch Academy Lunch" dedupes but "Brunch" doesn't
+    ends_with_menu_name = school_name.casefold() == menu_name.casefold() or (
+        school_name.casefold().endswith(f" {menu_name.casefold()}")
+    )
+    parts = [suffix] if ends_with_menu_name else [menu_name, suffix]
+    return " ".join(part for part in parts if part) or None
+
+
 def parse_day(raw_day: dict[str, Any]) -> ParsedDayMenu:
     """Parse a day dictionary from Nutrislice into ParsedDayMenu."""
     date_str = raw_day.get("date", "")

@@ -7,6 +7,7 @@ from tests.ha_mock import MockConfigEntry, setup_ha_mocks
 setup_ha_mocks()
 
 from custom_components.nutrislice.coordinator import (
+    menu_entity_name,
     NutrisliceMenuData,
     ParsedDayMenu,
     ParsedFoodItem,
@@ -112,6 +113,34 @@ class TestNutrisliceSensors(unittest.TestCase):
         self.assertIn("days", attrs)
         self.assertEqual(len(attrs["days"]), 2)
         self.assertEqual(attrs["school_name"], "Lincoln Elementary")
+
+
+class TestEntityNaming(unittest.TestCase):
+    """Test that entity names never repeat what the device name already says."""
+
+    def test_plain_school_name_keeps_the_menu_name(self):
+        self.assertEqual(menu_entity_name("Surf City Elementary", "Lunch"), "Lunch")
+        self.assertEqual(menu_entity_name("Surf City Elementary", "Lunch", "Today"), "Lunch Today")
+
+    def test_school_name_ending_in_menu_name_drops_it(self):
+        """A device called "Surf City Elementary Lunch" must not read "... Lunch Lunch"."""
+        self.assertIsNone(menu_entity_name("Surf City Elementary Lunch", "Lunch"))
+        self.assertEqual(menu_entity_name("Surf City Elementary Lunch", "Lunch", "Today"), "Today")
+
+    def test_dedupe_ignores_case_and_surrounding_space(self):
+        self.assertIsNone(menu_entity_name("Surf City Elementary LUNCH ", " Lunch "))
+
+    def test_menu_name_only_matched_at_the_end(self):
+        """"Lunch Bunch Academy" doesn't end with "Lunch", so nothing is dropped."""
+        self.assertEqual(menu_entity_name("Lunch Bunch Academy", "Lunch"), "Lunch")
+
+    def test_partial_word_is_not_treated_as_a_match(self):
+        """A school whose name merely *ends in* the letters of the menu keeps it."""
+        self.assertEqual(menu_entity_name("Deerlunch", "Lunch", "Today"), "Lunch Today")
+        self.assertEqual(menu_entity_name("Brunch", "Lunch"), "Lunch")
+
+    def test_school_named_exactly_the_menu_name(self):
+        self.assertIsNone(menu_entity_name("Lunch", "Lunch"))
 
 
 if __name__ == "__main__":

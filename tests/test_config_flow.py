@@ -7,6 +7,7 @@ from tests.ha_mock import MockConfigEntry, setup_ha_mocks
 setup_ha_mocks()
 
 from custom_components.nutrislice.api import CannotConnect
+from custom_components.nutrislice.const import LOOKUP_URL
 from custom_components.nutrislice.config_flow import (
     NutrisliceConfigFlow,
     NutrisliceOptionsFlowHandler,
@@ -23,17 +24,17 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.flow.hass = unittest.mock.MagicMock()
 
     async def test_step_user_empty_input(self):
-        """Test user step with empty input shows form."""
+        """Test user step with no input shows form."""
         result = await self.flow.async_step_user(None)
         self.assertEqual(result["type"], "form")
         self.assertEqual(result["step_id"], "user")
-        self.assertIn("lookup_url", result["description_placeholders"])
+        self.assertEqual(result["description_placeholders"]["lookup_url"], LOOKUP_URL)
 
-    async def test_step_user_invalid_district(self):
-        """Test user step with blank district shows error."""
-        result = await self.flow.async_step_user({"district": "   "})
+    async def test_step_user_nothing_entered(self):
+        """Both boxes left blank asks for one of them."""
+        result = await self.flow.async_step_user({"link": "  ", "district": ""})
         self.assertEqual(result["type"], "form")
-        self.assertEqual(result["errors"], {"base": "invalid_district"})
+        self.assertEqual(result["errors"], {"base": "nothing_entered"})
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
     async def test_step_user_name_search_lists_schools(self, mock_client_cls):
@@ -49,7 +50,6 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sampledistrictschools", candidates)
         self.assertIn("sample", candidates)
         self.assertEqual(self.flow._schools_by_district, {"sample-district": [LINCOLN]})
-        self.assertEqual(result["description_placeholders"]["districts"], "sample-district")
         self.assertEqual(result["description_placeholders"]["count"], "1")
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
@@ -64,8 +64,8 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sample-district", mock_client.async_find_districts.call_args.args[0])
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
-    async def test_step_user_no_match(self, mock_client_cls):
-        """A name that matches no district explains how to find it."""
+    async def test_step_user_no_match_suggests_a_link(self, mock_client_cls):
+        """A name that matches no district points at the link instead."""
         mock_client_cls.return_value.async_find_districts = AsyncMock(return_value={})
 
         result = await self.flow.async_step_user({"district": "Nowhere Unified"})
@@ -91,25 +91,31 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
     async def test_step_user_link_is_not_name_searched(self, mock_client_cls):
-        """A link checks only its own district, and a miss is an invalid link."""
+        """A link checks only its own district, and a miss is reported as a bad link."""
         mock_client = mock_client_cls.return_value
         mock_client.async_find_districts = AsyncMock(return_value={})
 
         result = await self.flow.async_step_user(
-            {"district": "https://nowhere.nutrislice.com/menu/some-school/lunch"}
+            {"link": "https://nowhere.nutrislice.com/menu/some-school/lunch"}
         )
 
         self.assertEqual(mock_client.async_find_districts.call_args.args[0], ["nowhere"])
-        self.assertEqual(result["errors"], {"base": "invalid_district"})
+        self.assertEqual(result["errors"], {"base": "invalid_link"})
+
+    async def test_step_user_unparseable_link(self):
+        """Something that isn't a Nutrislice address is rejected as a link."""
+        result = await self.flow.async_step_user({"link": "https://example.com/"})
+
+        self.assertEqual(result["errors"], {"base": "invalid_link"})
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
     async def test_step_user_full_url_shortcut(self, mock_client_cls):
-        """Test pasting full URL skips school step directly to menu types."""
+        """Pasting a link to a school skips straight to menu types."""
         mock_client = mock_client_cls.return_value
         mock_client.async_find_districts = AsyncMock(return_value={"sample-district": [LINCOLN]})
 
         url = "https://sample-district.nutrislice.com/menu/lincoln-elementary/lunch"
-        result = await self.flow.async_step_user({"district": url})
+        result = await self.flow.async_step_user({"link": url})
 
         self.assertEqual(result["type"], "form")
         self.assertEqual(result["step_id"], "menu_types")
@@ -117,12 +123,24 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.flow._selected_school["slug"], "lincoln-elementary")
 
     @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
+    async def test_step_user_link_wins_when_both_boxes_filled(self, mock_client_cls):
+        """A link is authoritative, so the name box is ignored."""
+        mock_client = mock_client_cls.return_value
+        mock_client.async_find_districts = AsyncMock(return_value={"sample-district": [LINCOLN]})
+
+        await self.flow.async_step_user(
+            {"link": "https://sample-district.nutrislice.com/menu", "district": "Totally Different"}
+        )
+
+        self.assertEqual(mock_client.async_find_districts.call_args.args[0], ["sample-district"])
+
+    @patch("custom_components.nutrislice.config_flow.NutrisliceApiClient")
     async def test_step_user_url_with_unknown_school_falls_back_to_picker(self, mock_client_cls):
         mock_client = mock_client_cls.return_value
         mock_client.async_find_districts = AsyncMock(return_value={"sample-district": [LINCOLN]})
 
         url = "https://sample-district.nutrislice.com/menu/renamed-school/lunch"
-        result = await self.flow.async_step_user({"district": url})
+        result = await self.flow.async_step_user({"link": url})
 
         self.assertEqual(result["step_id"], "school")
 

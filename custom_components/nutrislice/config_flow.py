@@ -1,7 +1,6 @@
 """Config flow for Nutrislice integration."""
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import voluptuous as vol
@@ -20,6 +19,7 @@ from .api import (
 )
 from .const import (
     CONF_DISTRICT,
+    CONF_LINK,
     CONF_MENU_TYPES,
     CONF_NEXT_SCHOOL_DAY_ON_WEEKEND,
     CONF_SCAN_INTERVAL_HOURS,
@@ -50,22 +50,29 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Step 1: Search by district name, or enter a district slug/Nutrislice link."""
+        """Step 1: Paste a menu link, or search for a district by name."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            raw_input = user_input.get(CONF_DISTRICT, "").strip()
-            is_link = "nutrislice.com" in raw_input.lower() or "://" in raw_input
-            link_district, school_slug, menu_type_slug = parse_nutrislice_url_or_slug(raw_input)
+            link = (user_input.get(CONF_LINK) or "").strip()
+            name = (user_input.get(CONF_DISTRICT) or "").strip()
 
-            # A link names its district exactly; anything else is a name to search
-            if is_link:
-                candidates = [link_district] if link_district else []
-            else:
-                candidates = candidate_districts(raw_input)
+            # A link identifies the district exactly; a name has to be guessed at
+            district, school_slug, menu_type_slug = parse_nutrislice_url_or_slug(link)
+            candidates = [district] if district else []
+            if not link:
+                school_slug = menu_type_slug = None
+                candidates = candidate_districts(name)
 
-            if not candidates:
-                errors["base"] = "invalid_district"
+            # Reject an unrelated address before spending a request on it
+            looks_like_address = any(char in link for char in ("/", ".", ":"))
+            if link and looks_like_address and "nutrislice.com" not in link.lower():
+                candidates = []
+
+            if not link and not name:
+                errors["base"] = "nothing_entered"
+            elif not candidates:
+                errors["base"] = "invalid_link" if link else "invalid_district"
             else:
                 client = NutrisliceApiClient(async_get_clientsession(self.hass))
                 try:
@@ -77,17 +84,17 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["base"] = "unknown"
                 else:
                     if not found:
-                        errors["base"] = "invalid_district" if is_link else "no_districts_found"
+                        errors["base"] = "invalid_link" if link else "no_districts_found"
                     else:
                         self._schools_by_district = found
                         self._preselected_menu_type = menu_type_slug
 
-                        # A pasted school link goes straight to menu selection
+                        # A link naming a school goes straight to menu selection
                         if school_slug and len(found) == 1:
-                            district, schools = next(iter(found.items()))
+                            only_district, schools = next(iter(found.items()))
                             for school in schools:
                                 if school.get("slug") == school_slug:
-                                    self._district = district
+                                    self._district = only_district
                                     self._selected_school = school
                                     return await self.async_step_menu_types()
 
@@ -95,7 +102,13 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_DISTRICT): selector.TextSelector(
+                vol.Optional(CONF_LINK): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.URL,
+                        multiline=False,
+                    )
+                ),
+                vol.Optional(CONF_DISTRICT): selector.TextSelector(
                     selector.TextSelectorConfig(
                         type=selector.TextSelectorType.TEXT,
                         multiline=False,
@@ -127,6 +140,7 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors["base"] = "school_not_found"
 
         # Name the district next to each school only when several matched
+        districts = ", ".join(self._schools_by_district)
         multiple_districts = len(self._schools_by_district) > 1
         school_options = [
             selector.SelectOptionDict(
@@ -163,7 +177,9 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "count": str(len(school_options)),
-                "districts": ", ".join(self._schools_by_district),
+                "districts": districts,
+                # Older releases' cached translations still reference {district}
+                "district": districts,
             },
         )
 

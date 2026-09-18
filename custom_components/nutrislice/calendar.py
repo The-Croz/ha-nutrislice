@@ -12,7 +12,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .coordinator import NutrisliceCoordinator, NutrisliceMenuData, ParsedDayMenu
+from .coordinator import (
+    NutrisliceCoordinator,
+    NutrisliceMenuData,
+    ParsedDayMenu,
+    menu_entity_name,
+)
 
 
 async def async_setup_entry(
@@ -49,7 +54,7 @@ class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], Calenda
             if self.menu_data
             else menu_type_slug.replace("-", " ").title()
         )
-        self._attr_name = f"{menu_name} Calendar"
+        self._attr_name = menu_entity_name(coordinator.school_name, menu_name)
         self._attr_unique_id = (
             f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_calendar"
         )

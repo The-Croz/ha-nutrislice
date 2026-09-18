@@ -242,7 +242,7 @@ def setup_ha_mocks():
     ha_sel = types.ModuleType("homeassistant.helpers.selector")
     ha_sel.TextSelector = lambda *args, **kwargs: None
     ha_sel.TextSelectorConfig = lambda *args, **kwargs: None
-    ha_sel.TextSelectorType = types.SimpleNamespace(TEXT="text")
+    ha_sel.TextSelectorType = types.SimpleNamespace(TEXT="text", URL="url", SEARCH="search")
     ha_sel.SelectSelector = lambda *args, **kwargs: None
     ha_sel.SelectSelectorConfig = lambda *args, **kwargs: None
     ha_sel.SelectSelectorMode = types.SimpleNamespace(DROPDOWN="dropdown", LIST="list")

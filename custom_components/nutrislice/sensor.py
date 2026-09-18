@@ -26,7 +26,7 @@ from .const import (
     DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DOMAIN,
 )
-from .coordinator import NutrisliceCoordinator, NutrisliceMenuData
+from .coordinator import NutrisliceCoordinator, NutrisliceMenuData, menu_entity_name
 
 
 async def async_setup_entry(
@@ -95,7 +95,7 @@ class NutrisliceTodayMenuSensor(NutrisliceBaseSensor):
         menu_name = (
             self.menu_data.menu_type_name if self.menu_data else menu_type_slug.replace("-", " ").title()
         )
-        self._attr_name = f"{menu_name} Today"
+        self._attr_name = menu_entity_name(coordinator.school_name, menu_name, "Today")
         self._attr_unique_id = (
             f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_today"
         )
@@ -163,7 +163,7 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
         menu_name = (
             self.menu_data.menu_type_name if self.menu_data else menu_type_slug.replace("-", " ").title()
         )
-        self._attr_name = f"{menu_name} Tomorrow"
+        self._attr_name = menu_entity_name(coordinator.school_name, menu_name, "Tomorrow")
         self._attr_unique_id = (
             f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_tomorrow"
         )
@@ -250,7 +250,7 @@ class NutrisliceFullMenuSensor(NutrisliceBaseSensor):
         menu_name = (
             self.menu_data.menu_type_name if self.menu_data else menu_type_slug.replace("-", " ").title()
         )
-        self._attr_name = f"{menu_name} Menu"
+        self._attr_name = menu_entity_name(coordinator.school_name, menu_name, "Menu")
         self._attr_unique_id = (
             f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_menu"
         )

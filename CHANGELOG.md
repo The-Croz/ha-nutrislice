@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-09-18
+
+### Added
+- Setup now has **two separate boxes**: one for a link to your school's Nutrislice menu, and one for searching by district name. The link is presented first because it always works, and the step links directly to [Nutrislice Lookup](https://lookup.nutrislice.com) for finding it.
+
+### Changed
+- Setup wording now talks about finding your *school*, and is explicit that name search guesses the district's web address and can't find districts whose address is unrelated to their name (for example Pender County Schools, which publishes at `greatschools.nutrislice.com`).
+- A link that isn't a Nutrislice address is now rejected immediately, without a network request.
+
+### Fixed
+- **Entity names no longer repeat the meal type.** A school whose name already ends with the menu type produced names like "Surf City Elementary Lunch Lunch Calendar". Entity names now omit a meal type the device name already carries, and the redundant trailing "Calendar" is dropped, giving "Surf City Elementary Lunch".
+  - Existing entity IDs are preserved by Home Assistant, so automations keep working; only display names change.
+- The school step no longer shows `[formatjs Error: MISSING_VALUE] ... "district" was not provided`. That happened when a stale cached translation was rendered against the newer step; the step now supplies the older `{district}` placeholder as well.
+
 ## [1.2.0] - 2026-09-18
 
 ### Added

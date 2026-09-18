@@ -12,7 +12,7 @@ View upcoming meals on a Home Assistant calendar, show today's and tomorrow's me
 
 ## ✨ Features
 
-- 🔍 **Search by Name:** Works for any school using Nutrislice. Type your district's name (e.g. `Fairfax County Public Schools`) and pick your school from the results, or paste a link from your school's Nutrislice website. The integration then discovers all available meal menus.
+- 🔍 **Easy Setup:** Paste a link to your school's Nutrislice menu, or search by district name. The integration then finds your school and all of its available meal menus.
 - 📅 **Native Calendar Platform:** Generates all-day calendar events for each school day with entrees, sides, and beverages, directly on your Home Assistant calendar.
 - 🔄 **Calendar Sync:** Optionally copy upcoming meals into any writable calendar (Local Calendar, Google Calendar, CalDAV, ...) so they appear alongside your other events on every device.
 - 🍽️ **Smart Sensors:**
@@ -49,21 +49,22 @@ The integration includes an interactive UI setup flow to find your school:
 
 1. In Home Assistant, navigate to **Settings** > **Devices & Services**.
 2. Click **+ Add Integration** and search for **Nutrislice**.
-3. Follow the setup wizard:
-   - **Step 1 (Find Your District):** Enter any of these:
-     - Your **district's name**, e.g. `Souderton`, `Austin ISD`, or `Fairfax County Public Schools`. Every matching district is searched and its schools are listed in the next step.
-     - Your district's **Nutrislice address**, e.g. `mydistrict.nutrislice.com`.
-     - **Any link** from your school's menu website, e.g. `https://mydistrict.nutrislice.com/menu/my-school/lunch`. A link that includes your school skips straight to Step 3.
-   - **Step 2 (School Selection):** Select your school from the list of schools found. If the search matched more than one district, each school is labelled with its district so you can pick the right one.
-   - **Step 3 (Menu Types):** Select which meal menus you want to track (e.g. `Lunch`, `Breakfast`, `Snack`).
-4. Click **Submit**. Your school device, sensors, and calendar entities will be automatically created!
+3. On **Step 1 (Find Your School)**, fill in *either* box:
+   - **Link to your school's Nutrislice menu** — the reliable option. Paste any address from your school's menu site, e.g. `https://my-district.nutrislice.com/menu/my-school/lunch`. A link that includes your school skips straight to Step 3.
+   - **Or search by district name** — e.g. `Souderton` or `Fairfax County Public Schools`. See the caveat below.
+4. **Step 2 (School Selection):** Pick your school from the list. If the search matched more than one district, each school is labelled with its district.
+5. **Step 3 (Menu Types):** Select which meal menus to track (e.g. `Lunch`, `Breakfast`, `Snack`).
+6. Click **Submit**. Your school device, sensors, and calendar entities are created automatically.
 
-### If your district isn't found
+### Finding your link
 
-Nutrislice doesn't publish a searchable directory of districts, so a name search works by checking the web addresses districts commonly use (for example `name`, `namesd`, `nameschools`, or initials like `fcps`). It finds most districts, but not those with an unrelated address. If nothing matches:
+Don't know your school's Nutrislice address? Open **[Nutrislice Lookup](https://lookup.nutrislice.com)**, search for your school, open its menu page, then copy the address out of your browser's address bar and paste it into Step 1.
 
-- Try a shorter name, such as just the town or the main word in the district's name.
-- Otherwise, use [Nutrislice Lookup](https://lookup.nutrislice.com) to find your school. It opens your school's menu page, and you can paste that page's address into Step 1.
+### Why search by name doesn't always work
+
+Nutrislice has no public directory of districts, and its own lookup service is protected by a CAPTCHA that an integration can't use. Searching by name therefore works by *guessing* the web address from the name — trying forms like `souderton`, `soudertonsd`, `soudertonschools`, and initials such as `fcps`.
+
+That finds many districts, but **it cannot find a district whose web address is unrelated to its name.** For example, Pender County Schools in North Carolina publishes at `greatschools.nutrislice.com`, which no amount of guessing will produce from "Pender" or "Surf City". If your district is one of these, use the link instead — it always works.
 
 ---
 
@@ -73,12 +74,14 @@ For each configured school and meal type:
 
 | Entity Pattern | Platform | Description |
 | :--- | :--- | :--- |
-| `calendar.<school>_<menu>_calendar` | Calendar | Upcoming school meals with entree summaries and formatted descriptions. |
+| `calendar.<school>_<menu>` | Calendar | Upcoming school meals with entree summaries and formatted descriptions. |
 | `sensor.<school>_<menu>_today` | Sensor | State is today's main entree summary (e.g. `Cheeseburger, Pizza`). |
 | `sensor.<school>_<menu>_tomorrow` | Sensor | State is tomorrow's main entrees (or the next school day's meal on weekends). |
 | `sensor.<school>_<menu>_menu` | Sensor | State is the current date, with the full raw `days` structure in attributes. |
 
-`<school>` is the school's name and `<menu>` is the meal type, both lowercased with underscores. *(For example, a school named "Maple Grove" with a Lunch menu gets `sensor.maple_grove_lunch_today`, `sensor.maple_grove_lunch_tomorrow`, and `calendar.maple_grove_lunch_calendar`.)*
+`<school>` is the school's name and `<menu>` is the meal type, both lowercased with underscores. *(For example, a school named "Maple Grove" with a Lunch menu gets `sensor.maple_grove_lunch_today`, `sensor.maple_grove_lunch_tomorrow`, and `calendar.maple_grove_lunch`.)*
+
+> **Upgrading from 1.2.0 or earlier?** Entity IDs you already have are kept as-is by Home Assistant, so your automations keep working. Only the display names change (the redundant trailing "Calendar" is dropped).
 
 The examples below use `my_school_lunch` as a placeholder. Replace it with your own entity IDs, which you can find under **Settings** > **Devices & Services** > **Nutrislice**.
 
@@ -157,7 +160,7 @@ alias: "School Lunch: Morning Calendar Reminder"
 triggers:
   - trigger: calendar
     event: start
-    entity_id: calendar.my_school_lunch_calendar
+    entity_id: calendar.my_school_lunch
     offset: "07:00:00" # 7:00 AM on the day of the meal
 actions:
   - action: notify.notify
@@ -191,7 +194,7 @@ content: >
 ```yaml
 type: calendar
 entities:
-  - calendar.my_school_lunch_calendar
+  - calendar.my_school_lunch
 initial_view: dayGridMonth
 ```
 

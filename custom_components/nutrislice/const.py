@@ -8,6 +8,7 @@ DOMAIN: Final = "nutrislice"
 LOGGER = logging.getLogger(__package__)
 
 CONF_DISTRICT: Final = "district"
+CONF_LINK: Final = "link"
 CONF_SCHOOL_SLUG: Final = "school_slug"
 CONF_SCHOOL_NAME: Final = "school_name"
 CONF_MENU_TYPES: Final = "menu_types"
