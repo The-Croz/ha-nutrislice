@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-09-18
+
+### Added
+- **Search by name during setup.** Type a district's name (e.g. `Souderton`, `Austin ISD`, `Fairfax County Public Schools`) instead of needing its exact Nutrislice address. Every matching district is searched, and the next step lists their schools to pick from, labelled by district when more than one matched.
+  - Nutrislice has no public district directory, so names are matched against the web addresses districts commonly use (`name`, `namesd`, `nameschools`, initials, ...). Setup points to [Nutrislice Lookup](https://lookup.nutrislice.com) for districts that don't match.
+  - Links and exact addresses still work, and a link that includes a school still skips straight to choosing menus.
+- New `dark_icon.png` and `dark_logo.png` brand images for Home Assistant's dark theme.
+
+### Changed
+- Setup text and the error for a name that matches nothing now explain how to find your district.
+
+### Fixed
+- Entering a district that doesn't exist reported "Failed to connect to Nutrislice servers" instead of "district not found", because unknown districts fail at DNS. Now it only reports a connection problem when Nutrislice itself can't be reached.
+- The integration icon and logo were the wrong image. They now use the Nutrislice mark.
+
 ## [1.1.0] - 2026-09-18
 
 ### Added
