@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.6.0] - 2026-09-19
 
 ### Added
 - **`menu_markdown` attribute on the Today and Tomorrow sensors:** the whole menu pre-formatted as Markdown, with a bold emoji heading and bullet list for each course (🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, 🥛 Beverages). Drop it straight into a Markdown card; a day with no menu reads `No menu scheduled`, so a card never shows `None`. It is always the full menu, whatever courses are ticked for titles and states. The README's dashboard card now uses it.
