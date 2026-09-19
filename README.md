@@ -18,7 +18,7 @@ View upcoming meals on a Home Assistant calendar, show today's and tomorrow's me
 - 🍽️ **Smart Sensors:**
   - **Today's Menu:** Displays today's main entrees as state, with sides, allergens, and full menu items in attributes.
   - **Tomorrow's Menu:** Displays tomorrow's main entrees (with an option to preview Monday's lunch over the weekend!).
-  - **Raw Menu (diagnostic, off by default):** Exposes the full raw `days` list matching standard REST sensor formats, for templates written against one. Not needed for anything else.
+  - **Dashboard-Ready Menu:** Both sensors have a `menu_markdown` attribute with the whole menu grouped by course, ready to drop into a Markdown card.
 - 🛡️ **Rate-Limit Friendly:** Fetches 2 weeks in advance with configurable update polling (default: every 4 hours).
 - 🏷️ **Clean Item Categorization:** Separates entrees from sides, fruits, vegetables, milk, and condiments.
 
@@ -77,15 +77,14 @@ For each configured school and meal type:
 | `calendar.<school>_<menu>` | Calendar | Upcoming school meals with entree summaries and formatted descriptions. |
 | `sensor.<school>_<menu>_today` | Sensor | State is today's entrees (e.g. `Cheeseburger, Pizza`), or `No Menu Scheduled`. |
 | `sensor.<school>_<menu>_tomorrow` | Sensor | State is tomorrow's entrees (or the next school day's meal on weekends). |
-| `sensor.<school>_<menu>_menu` | Diagnostic sensor | Raw Nutrislice data in a `days` attribute, for templates written against a REST sensor. **Disabled by default** and hidden under the device's Diagnostic section; enable it there if you need it. |
 
-The Today and Tomorrow states show the same courses as your calendar event titles (see **Show in Calendar Titles and Sensors** under Options), so with the default they are the entree list shown above.
+The Today and Tomorrow states show the same courses as your calendar event titles (see **Show in Calendar Titles and Sensors** under Options), so with the default they are the entree list shown above. The full menu is always in the attributes.
 
 `<school>` is the school's name and `<menu>` is the meal type, both lowercased with underscores. *(For example, a school named "Maple Grove" with a Lunch menu gets `sensor.maple_grove_lunch_today`, `sensor.maple_grove_lunch_tomorrow`, and `calendar.maple_grove_lunch`.)*
 
 > **Upgrading from 1.2.0 or earlier?** Entity IDs you already have are kept as-is by Home Assistant, so your automations keep working. Only the display names change (the redundant trailing "Calendar" is dropped).
 
-The **Today** and **Tomorrow** sensors carry `date`, `entrees`, `sides`, `fruits`, `vegetables`, `beverages`, and `menu_items` (with calories and allergens) attributes. The **Tomorrow** sensor also has `is_next_school_day`, which is `true` when it's showing a later school day because tomorrow has no menu. `sides` includes fruit and vegetables; `fruits` and `vegetables` list those separately.
+The **Today** and **Tomorrow** sensors carry `date`, `entrees`, `sides`, `fruits`, `vegetables`, `beverages`, and `menu_items` (with calories and allergens) attributes, plus `menu_markdown`: the whole menu pre-formatted as Markdown (a bold heading and bullet list for each course, or `No menu scheduled`). The **Tomorrow** sensor also has `is_next_school_day`, which is `true` when it's showing a later school day because tomorrow has no menu. `sides` includes fruit and vegetables; `fruits` and `vegetables` list those separately.
 
 The examples below use `my_school_lunch` as a placeholder. Replace it with your own entity IDs, which you can find under **Settings** > **Devices & Services** > **Nutrislice**.
 
@@ -157,13 +156,17 @@ actions:
 ## 📊 Dashboard Card Examples
 
 ### Markdown Card: Today & Next School Day
+The `menu_markdown` attribute is the whole menu, already grouped by course, so the card needs no formatting of its own:
+
 ```yaml
 type: markdown
 title: School Lunch
 content: |
-  **Today:** {{ states('sensor.my_school_lunch_today') }}
+  ## Today
+  {{ state_attr('sensor.my_school_lunch_today', 'menu_markdown') or 'Not available' }}
 
-  **Next:** {{ states('sensor.my_school_lunch_tomorrow') }}
+  ## Next School Day
+  {{ state_attr('sensor.my_school_lunch_tomorrow', 'menu_markdown') or 'Not available' }}
 ```
 
 ### Calendar Card

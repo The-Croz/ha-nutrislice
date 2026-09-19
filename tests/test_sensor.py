@@ -1,5 +1,6 @@
 """Unit tests for Nutrislice sensors."""
 from datetime import date, datetime
+import types
 import unittest
 
 from tests.ha_mock import MockConfigEntry, setup_ha_mocks
@@ -13,7 +14,7 @@ from custom_components.nutrislice.coordinator import (
     ParsedFoodItem,
 )
 from custom_components.nutrislice.sensor import (
-    NutrisliceFullMenuSensor,
+    _async_remove_raw_menu_entities,
     NutrisliceTodayMenuSensor,
     NutrisliceTomorrowMenuSensor,
 )
@@ -74,7 +75,6 @@ class TestNutrisliceSensors(unittest.TestCase):
             school_name="Lincoln Elementary",
             menu_type_slug="lunch",
             menu_type_name="Lunch",
-            days=[today_menu.raw_day, tomorrow_menu.raw_day],
             days_by_date={self.today_str: today_menu, "2026-09-19": tomorrow_menu},
             today=today_menu,
             tomorrow=tomorrow_menu,
@@ -106,14 +106,6 @@ class TestNutrisliceSensors(unittest.TestCase):
         self.assertEqual(attrs["date"], "2026-09-19")
         self.assertEqual(attrs["entrees"], ["Tacos"])
 
-    def test_full_menu_legacy_sensor(self):
-        sensor = NutrisliceFullMenuSensor(self.mock_coord, self.mock_entry, "lunch")
-        self.assertEqual(sensor.native_value, self.today_str)
-        attrs = sensor.extra_state_attributes
-        self.assertIn("days", attrs)
-        self.assertEqual(len(attrs["days"]), 2)
-        self.assertEqual(attrs["school_name"], "Lincoln Elementary")
-
 
 class TestSensorStateSections(unittest.TestCase):
     """The event-title course checkboxes also decide the Today and Tomorrow sensor states."""
@@ -138,7 +130,6 @@ class TestSensorStateSections(unittest.TestCase):
             school_name="Lincoln Elementary",
             menu_type_slug="lunch",
             menu_type_name="Lunch",
-            days=[],
             days_by_date={self.today.date_str: self.today},
             today=self.today,
             tomorrow=self.today,
@@ -196,20 +187,126 @@ class TestSensorStateSections(unittest.TestCase):
         self.assertEqual(attrs["fruits"], ["Apple"])
 
 
-class TestMenuSensorIsDiagnostic(unittest.TestCase):
-    """The raw-data sensor is kept out of the way, and its huge attribute out of the database."""
+class TestMenuMarkdownAttribute(unittest.TestCase):
+    """Today and Tomorrow carry the whole menu pre-formatted for a Markdown dashboard card."""
 
-    def test_diagnostic_and_disabled_by_default(self):
-        self.assertEqual(NutrisliceFullMenuSensor._attr_entity_category, "diagnostic")
-        self.assertFalse(NutrisliceFullMenuSensor._attr_entity_registry_enabled_default)
+    def setUp(self):
+        today = date.today()
+        self.day = ParsedDayMenu(
+            date_str=today.isoformat(),
+            target_date=today,
+            is_holiday=False,
+            has_menu=True,
+            entrees=["Cheeseburger", "Cheese Pizza"],
+            sides=["Breadstick", "Apple"],
+            fruits=["Apple"],
+            beverages=["Milk"],
+            condiments=["Ketchup"],
+            raw_day={"date": today.isoformat()},
+        )
+        self.menu_data = NutrisliceMenuData(
+            district="d", school_slug="s", school_name="Lincoln Elementary",
+            menu_type_slug="lunch", menu_type_name="Lunch",
+            days_by_date={self.day.date_str: self.day},
+            today=self.day, tomorrow=self.day, next_school_day=None,
+            last_updated=datetime(2026, 9, 18, 12, 0, 0),
+        )
+        self.coord = MockCoordinator(data={"lunch": self.menu_data})
+        self.entry = MockConfigEntry()
 
-    def test_days_attribute_is_not_recorded(self):
-        self.assertIn("days", NutrisliceFullMenuSensor._unrecorded_attributes)
+    EXPECTED = (
+        "**🍽️ Entrees**\n- Cheeseburger\n- Cheese Pizza\n\n"
+        "**🥖 Sides**\n- Breadstick\n\n"
+        "**🍎 Fruit**\n- Apple\n\n"
+        "**🥛 Beverages**\n- Milk"
+    )
 
-    def test_other_sensors_are_normal_entities(self):
+    def test_today_and_tomorrow_have_it(self):
         for sensor in (NutrisliceTodayMenuSensor, NutrisliceTomorrowMenuSensor):
-            self.assertIsNone(getattr(sensor, "_attr_entity_category", None))
-            self.assertTrue(getattr(sensor, "_attr_entity_registry_enabled_default", True))
+            with self.subTest(sensor=sensor.__name__):
+                attrs = sensor(self.coord, self.entry, "lunch").extra_state_attributes
+                self.assertEqual(attrs["menu_markdown"], self.EXPECTED)
+
+    def test_is_not_affected_by_the_title_courses_setting(self):
+        """The attribute is the full menu; only the state follows the checkboxes."""
+        entry = MockConfigEntry(options={"title_sections": []})
+        attrs = NutrisliceTodayMenuSensor(self.coord, entry, "lunch").extra_state_attributes
+        self.assertEqual(attrs["menu_markdown"], self.EXPECTED)
+
+    def test_condiments_are_left_out(self):
+        attrs = NutrisliceTodayMenuSensor(self.coord, self.entry, "lunch").extra_state_attributes
+        self.assertNotIn("Ketchup", attrs["menu_markdown"])
+
+    def test_no_menu_gives_a_friendly_line_not_none(self):
+        """A card templating this attribute must never render 'None'."""
+        self.menu_data.today = None
+        self.menu_data.tomorrow = None
+        for sensor in (NutrisliceTodayMenuSensor, NutrisliceTomorrowMenuSensor):
+            with self.subTest(sensor=sensor.__name__):
+                attrs = sensor(self.coord, self.entry, "lunch").extra_state_attributes
+                self.assertEqual(attrs["menu_markdown"], "No menu scheduled")
+
+    def test_today_keeps_todays_date_when_there_is_no_menu(self):
+        self.menu_data.today = None
+        attrs = NutrisliceTodayMenuSensor(self.coord, self.entry, "lunch").extra_state_attributes
+        self.assertEqual(attrs["date"], date.today().isoformat())
+
+    def test_tomorrow_reports_whether_it_is_the_next_school_day(self):
+        attrs = NutrisliceTomorrowMenuSensor(self.coord, self.entry, "lunch").extra_state_attributes
+        self.assertIs(attrs["is_next_school_day"], False)
+
+
+class FakeRegistry:
+    """Just enough entity registry to test stale-entity cleanup."""
+
+    def __init__(self, entities):
+        self.entities = dict(entities)  # (domain, platform, unique_id) -> entity_id
+        self.removed = []
+
+    def async_get_entity_id(self, domain, platform, unique_id):
+        return self.entities.get((domain, platform, unique_id))
+
+    def async_remove(self, entity_id):
+        self.removed.append(entity_id)
+
+
+class TestRawMenuEntityCleanup(unittest.TestCase):
+    """The raw Menu sensor from earlier releases is removed instead of left unavailable."""
+
+    def test_removes_the_old_menu_sensor_and_nothing_else(self):
+        registry = FakeRegistry({
+            ("sensor", "nutrislice", "d_s_lunch_menu"): "sensor.school_lunch_menu",
+            ("sensor", "nutrislice", "d_s_lunch_today"): "sensor.school_lunch_today",
+        })
+        hass = types.SimpleNamespace(entity_registry=registry)
+        coord = MockCoordinator(data={"lunch": object()})
+        coord.district, coord.school_slug = "d", "s"
+
+        _async_remove_raw_menu_entities(hass, coord)
+
+        self.assertEqual(registry.removed, ["sensor.school_lunch_menu"])
+
+    def test_covers_every_menu_type(self):
+        registry = FakeRegistry({
+            ("sensor", "nutrislice", "d_s_lunch_menu"): "sensor.lunch_menu",
+            ("sensor", "nutrislice", "d_s_breakfast_menu"): "sensor.breakfast_menu",
+        })
+        hass = types.SimpleNamespace(entity_registry=registry)
+        coord = MockCoordinator(data={"lunch": object(), "breakfast": object()})
+        coord.district, coord.school_slug = "d", "s"
+
+        _async_remove_raw_menu_entities(hass, coord)
+
+        self.assertEqual(sorted(registry.removed), ["sensor.breakfast_menu", "sensor.lunch_menu"])
+
+    def test_nothing_to_remove_on_a_fresh_install(self):
+        registry = FakeRegistry({})
+        coord = MockCoordinator(data={"lunch": object()})
+        coord.district, coord.school_slug = "d", "s"
+
+        _async_remove_raw_menu_entities(types.SimpleNamespace(entity_registry=registry), coord)
+
+        self.assertEqual(registry.removed, [])
 
 
 class TestEntityNaming(unittest.TestCase):

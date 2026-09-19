@@ -214,7 +214,6 @@ def setup_ha_mocks():
 
     ha_const = types.ModuleType("homeassistant.const")
     ha_const.Platform = MockPlatform
-    ha_const.EntityCategory = types.SimpleNamespace(DIAGNOSTIC="diagnostic", CONFIG="config")
 
     ha_ce = types.ModuleType("homeassistant.config_entries")
     ha_ce.ConfigEntry = MockConfigEntry
@@ -255,6 +254,9 @@ def setup_ha_mocks():
     ha_sel.EntitySelector = lambda *args, **kwargs: None
     ha_sel.EntitySelectorConfig = lambda *args, **kwargs: None
     ha_sel.EntityFilterSelectorConfig = lambda *args, **kwargs: None
+
+    ha_er = types.ModuleType("homeassistant.helpers.entity_registry")
+    ha_er.async_get = lambda hass: hass.entity_registry
 
     ha_exc = types.ModuleType("homeassistant.exceptions")
     ha_exc.HomeAssistantError = MockHomeAssistantError
@@ -306,6 +308,8 @@ def setup_ha_mocks():
     ha_helpers.config_validation = ha_cv
     sys.modules["homeassistant.helpers.typing"] = ha_typing
     ha_helpers.typing = ha_typing
+    sys.modules["homeassistant.helpers.entity_registry"] = ha_er
+    ha_helpers.entity_registry = ha_er
     sys.modules["homeassistant.exceptions"] = ha_exc
     sys.modules["homeassistant.util"] = ha_util
     sys.modules["homeassistant.util.dt"] = ha_dt

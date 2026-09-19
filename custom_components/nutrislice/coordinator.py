@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -21,6 +22,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_HOURS,
     BEVERAGE_FOOD_CATEGORIES,
     COURSE_EMOJI,
+    COURSE_HEADINGS,
     DEFAULT_TITLE_SECTIONS,
     CONDIMENT_FOOD_CATEGORIES,
     CONDIMENT_FOOD_CATEGORY_PREFIXES,
@@ -97,20 +99,28 @@ class ParsedDayMenu:
     @property
     def formatted_description(self) -> str:
         """Menu grouped by course with emoji headings, for calendar events and notifications."""
-        headings = {
-            "entrees": "Entrees",
-            "sides": "Sides",
-            "fruits": "Fruit",
-            "vegetables": "Vegetables",
-            "beverages": "Beverages",
-        }
         blocks = [
-            f"{COURSE_EMOJI[course]} {headings[course]}:\n"
+            f"{COURSE_EMOJI[course]} {COURSE_HEADINGS[course]}:\n"
             + "\n".join(f"• {name}" for name in names)
             for course, names in self.courses.items()
             if names
         ]
         return "\n\n".join(blocks) if blocks else "No menu items published."
+
+    @property
+    def formatted_markdown(self) -> str:
+        """Menu grouped by course as Markdown, ready for a dashboard Markdown card.
+
+        Each course is a bold emoji heading over a bullet list. Condiments are
+        left out, as in the calendar description.
+        """
+        blocks = [
+            f"**{COURSE_EMOJI[course]} {COURSE_HEADINGS[course]}**\n"
+            + "\n".join(f"- {escape_markdown(name)}" for name in names)
+            for course, names in self.courses.items()
+            if names
+        ]
+        return "\n\n".join(blocks) if blocks else NO_MENU_MARKDOWN
 
     def courses_text(self, sections: list[str]) -> str:
         """Return the chosen courses on one line, each led by its emoji.
@@ -170,12 +180,19 @@ class NutrisliceMenuData:
     school_name: str
     menu_type_slug: str
     menu_type_name: str
-    days: list[dict[str, Any]]
     days_by_date: dict[str, ParsedDayMenu]
     today: ParsedDayMenu | None
     tomorrow: ParsedDayMenu | None
     next_school_day: ParsedDayMenu | None
     last_updated: datetime
+
+
+NO_MENU_MARKDOWN = "No menu scheduled"
+
+
+def escape_markdown(text: str) -> str:
+    """Escape characters that would be read as Markdown formatting in a menu item."""
+    return re.sub(r"([\\`*_\[\]<>])", r"\\\1", text)
 
 
 # Home Assistant rejects sensor states longer than 255 characters; leave headroom
@@ -445,7 +462,6 @@ class NutrisliceCoordinator(DataUpdateCoordinator[dict[str, NutrisliceMenuData]]
                 school_name=self.school_name,
                 menu_type_slug=menu_type_slug,
                 menu_type_name=menu_type_name,
-                days=raw_days,
                 days_by_date=days_by_date,
                 today=today_menu,
                 tomorrow=tomorrow_menu,

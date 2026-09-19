@@ -11,6 +11,7 @@ from custom_components.nutrislice.coordinator import (
     ParsedDayMenu,
     calendar_title_prefix,
     classify_item,
+    escape_markdown,
     parse_day,
 )
 
@@ -210,6 +211,38 @@ class TestEventTitleSections(unittest.TestCase):
     def test_nothing_selected_shows_just_the_meal(self):
         self.assertEqual(self.day.calendar_summary("Lunch", []), "🍽️ Lunch")
         self.assertEqual(self.day.calendar_summary("Breakfast", []), "🥞 Breakfast")
+
+
+class TestFormattedMarkdown(unittest.TestCase):
+    """The pre-formatted menu for dashboard Markdown cards."""
+
+    def test_real_menu_is_grouped_with_bold_emoji_headings_and_bullets(self):
+        self.assertEqual(
+            parse_day(REAL_LUNCH).formatted_markdown,
+            "**🍽️ Entrees**\n- Peanut Butter & Jelly Sandwich\n- Salisbury Steak\n- Pepperoni Pizza\n- Egg Chef Salad"
+            "\n\n**🥖 Sides**\n- Fresh Baked Breadstick\n- Dinner Roll"
+            "\n\n**🍎 Fruit**\n- Red Delicious Apple"
+            "\n\n**🥦 Vegetables**\n- Mashed Potatoes"
+            "\n\n**🥛 Beverages**\n- Fruit Juice\n- 1% Milk",
+        )
+
+    def test_matches_the_calendar_description_courses(self):
+        """Same groups in the same order; only the markup differs."""
+        day = parse_day(REAL_LUNCH)
+        strip = lambda text: [line.strip("*• -:") for line in text.splitlines() if line.strip()]
+        self.assertEqual(strip(day.formatted_markdown), strip(day.formatted_description))
+
+    def test_empty_day(self):
+        self.assertEqual(parse_day({"date": "2026-09-19", "menu_items": []}).formatted_markdown, "No menu scheduled")
+
+    def test_markdown_characters_in_names_are_escaped(self):
+        day = parse_day({"date": "2026-09-19", "menu_items": [
+            section("Entree"), item("Mac_n_Cheese *Special* [new] <b>", "entree")]})
+        self.assertEqual(day.formatted_markdown, "**🍽️ Entrees**\n- Mac\\_n\\_Cheese \\*Special\\* \\[new\\] \\<b\\>")
+
+    def test_escape_leaves_ordinary_punctuation_alone(self):
+        for text in ("PBJ Sandwich, Animal Crackers & Cheese Stick Pack", "1% Milk", "Chef's Salad (fresh)", "Mac-n-Cheese"):
+            self.assertEqual(escape_markdown(text), text)
 
 
 class TestClassification(unittest.TestCase):

@@ -5,9 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **`menu_markdown` attribute on the Today and Tomorrow sensors:** the whole menu pre-formatted as Markdown, with a bold emoji heading and bullet list for each course (🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, 🥛 Beverages). Drop it straight into a Markdown card; a day with no menu reads `No menu scheduled`, so a card never shows `None`. It is always the full menu, whatever courses are ticked for titles and states. The README's dashboard card now uses it.
+
 ### Changed
 - **The course checkboxes now also set the Today and Tomorrow sensor states**, so they match the calendar event titles. With the default (Entrees only) nothing changes. A day with no menu is always `No Menu Scheduled`, whatever is ticked, and long states are shortened to fit Home Assistant's 255-character limit. Attributes always contain the full menu. The setting is now labelled "Show in calendar titles and sensors".
-- **The raw Menu sensor is now a diagnostic entity, and new installs get it disabled.** Nothing in the integration uses it; it exists only for templates written against a REST sensor. Its `days` attribute is over 1 MB for two weeks of menus, far past the 16 KB Home Assistant's recorder accepts, so it's no longer written to the database (this stops the recorder's size warnings). If you already have this sensor it stays enabled and its entity ID is unchanged; it just moves to the Diagnostic section.
+
+### Removed
+- **The raw "Menu" sensor (`sensor.<school>_<menu>_menu`).** Nothing in the integration used it. It held every menu item Nutrislice returns for two weeks, over 1 MB, about 100 times what Home Assistant's database accepts, so it caused recorder size warnings on every update and was sent to every open browser. Existing copies are removed automatically on upgrade. If a template or dashboard read its `days` attribute, switch it to the Today and Tomorrow sensors, whose attributes hold the same menu items, or to `menu_markdown`.
 
 ## [1.5.0] - 2026-09-19
 

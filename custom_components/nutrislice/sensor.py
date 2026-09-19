@@ -5,8 +5,8 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -17,11 +17,10 @@ from .const import (
     DEFAULT_TITLE_SECTIONS,
     ATTR_CATEGORIES,
     ATTR_DATE,
-    ATTR_DAYS,
-    ATTR_DISTRICT,
     ATTR_ENTREES,
     ATTR_LAST_UPDATED,
     ATTR_MENU_ITEMS,
+    ATTR_MENU_MARKDOWN,
     ATTR_MENU_TYPE,
     ATTR_SCHOOL_NAME,
     ATTR_SIDES,
@@ -29,7 +28,13 @@ from .const import (
     DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DOMAIN,
 )
-from .coordinator import NutrisliceCoordinator, NutrisliceMenuData, menu_entity_name
+from .coordinator import (
+    NO_MENU_MARKDOWN,
+    NutrisliceCoordinator,
+    NutrisliceMenuData,
+    ParsedDayMenu,
+    menu_entity_name,
+)
 
 
 async def async_setup_entry(
@@ -40,15 +45,28 @@ async def async_setup_entry(
     """Set up Nutrislice sensors from a config entry."""
     coordinator: NutrisliceCoordinator = hass.data[DOMAIN][entry.entry_id]
 
+    _async_remove_raw_menu_entities(hass, coordinator)
+
     async_add_entities(
         sensor_class(coordinator, entry, menu_type_slug)
         for menu_type_slug in coordinator.data
-        for sensor_class in (
-            NutrisliceTodayMenuSensor,
-            NutrisliceTomorrowMenuSensor,
-            NutrisliceFullMenuSensor,
-        )
+        for sensor_class in (NutrisliceTodayMenuSensor, NutrisliceTomorrowMenuSensor)
     )
+
+
+def _async_remove_raw_menu_entities(
+    hass: HomeAssistant, coordinator: NutrisliceCoordinator
+) -> None:
+    """Remove the raw "Menu" sensors that releases before 1.6.0 created.
+
+    They're no longer provided, and would otherwise linger in the registry as
+    permanently unavailable entities.
+    """
+    registry = er.async_get(hass)
+    for menu_type_slug in coordinator.data:
+        unique_id = f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_menu"
+        if entity_id := registry.async_get_entity_id("sensor", DOMAIN, unique_id):
+            registry.async_remove(entity_id)
 
 
 class NutrisliceBaseSensor(CoordinatorEntity[NutrisliceCoordinator], SensorEntity):
@@ -71,6 +89,43 @@ class NutrisliceBaseSensor(CoordinatorEntity[NutrisliceCoordinator], SensorEntit
     def menu_data(self) -> NutrisliceMenuData | None:
         """Return menu data for this menu type."""
         return self.coordinator.data.get(self.menu_type_slug)
+
+    def _menu_attributes(self, day: ParsedDayMenu | None) -> dict[str, Any]:
+        """Return the attributes describing one day's menu."""
+        if not self.menu_data or not day:
+            return {
+                ATTR_DATE: None,
+                ATTR_ENTREES: [],
+                ATTR_SIDES: [],
+                ATTR_MENU_ITEMS: [],
+                ATTR_MENU_MARKDOWN: NO_MENU_MARKDOWN,
+                ATTR_SCHOOL_NAME: self.coordinator.school_name,
+                ATTR_MENU_TYPE: self.menu_type_slug,
+            }
+
+        return {
+            ATTR_DATE: day.date_str,
+            ATTR_ENTREES: day.entrees,
+            ATTR_SIDES: day.sides,
+            "beverages": day.beverages,
+            "fruits": day.fruits,
+            "vegetables": day.vegetables,
+            ATTR_MENU_MARKDOWN: day.formatted_markdown,
+            ATTR_CATEGORIES: day.categories,
+            ATTR_MENU_ITEMS: [
+                {
+                    "name": item.name,
+                    "category": item.category,
+                    "section": item.section,
+                    "calories": item.calories,
+                    "allergens": item.allergens,
+                }
+                for item in day.items
+            ],
+            ATTR_SCHOOL_NAME: self.menu_data.school_name,
+            ATTR_MENU_TYPE: self.menu_data.menu_type_name,
+            ATTR_LAST_UPDATED: self.menu_data.last_updated.isoformat(),
+        }
 
     @property
     def title_sections(self) -> list[str]:
@@ -126,39 +181,10 @@ class NutrisliceTodayMenuSensor(NutrisliceBaseSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return attributes for today's menu."""
-        if not self.menu_data or not self.menu_data.today:
-            return {
-                ATTR_DATE: dt_util.now().date().isoformat(),
-                ATTR_ENTREES: [],
-                ATTR_SIDES: [],
-                ATTR_MENU_ITEMS: [],
-                ATTR_SCHOOL_NAME: self.coordinator.school_name,
-                ATTR_MENU_TYPE: self.menu_type_slug,
-            }
-
-        today = self.menu_data.today
-        return {
-            ATTR_DATE: today.date_str,
-            ATTR_ENTREES: today.entrees,
-            ATTR_SIDES: today.sides,
-            "beverages": today.beverages,
-            "fruits": today.fruits,
-            "vegetables": today.vegetables,
-            ATTR_CATEGORIES: today.categories,
-            ATTR_MENU_ITEMS: [
-                {
-                    "name": item.name,
-                    "category": item.category,
-                    "section": item.section,
-                    "calories": item.calories,
-                    "allergens": item.allergens,
-                }
-                for item in today.items
-            ],
-            ATTR_SCHOOL_NAME: self.menu_data.school_name,
-            ATTR_MENU_TYPE: self.menu_data.menu_type_name,
-            ATTR_LAST_UPDATED: self.menu_data.last_updated.isoformat(),
-        }
+        attrs = self._menu_attributes(self.menu_data.today if self.menu_data else None)
+        # Even with no menu, today's date is meaningful
+        attrs[ATTR_DATE] = attrs[ATTR_DATE] or dt_util.now().date().isoformat()
+        return attrs
 
 
 class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
@@ -214,94 +240,4 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return attributes for tomorrow's menu."""
         target, is_next_school_day = self._target_menu
-        if not target:
-            return {
-                ATTR_DATE: None,
-                ATTR_ENTREES: [],
-                ATTR_SIDES: [],
-                ATTR_MENU_ITEMS: [],
-                "is_next_school_day": False,
-                ATTR_SCHOOL_NAME: self.coordinator.school_name,
-                ATTR_MENU_TYPE: self.menu_type_slug,
-            }
-
-        return {
-            ATTR_DATE: target.date_str,
-            "is_next_school_day": is_next_school_day,
-            ATTR_ENTREES: target.entrees,
-            ATTR_SIDES: target.sides,
-            "beverages": target.beverages,
-            "fruits": target.fruits,
-            "vegetables": target.vegetables,
-            ATTR_CATEGORIES: target.categories,
-            ATTR_MENU_ITEMS: [
-                {
-                    "name": item.name,
-                    "category": item.category,
-                    "section": item.section,
-                    "calories": item.calories,
-                    "allergens": item.allergens,
-                }
-                for item in target.items
-            ],
-            ATTR_SCHOOL_NAME: self.menu_data.school_name,
-            ATTR_MENU_TYPE: self.menu_data.menu_type_name,
-            ATTR_LAST_UPDATED: self.menu_data.last_updated.isoformat(),
-        }
-
-
-class NutrisliceFullMenuSensor(NutrisliceBaseSensor):
-    """Raw Nutrislice menu data, for templates written against a REST sensor.
-
-    Nothing in the integration reads this entity: the calendar and the other
-    sensors use the coordinator directly. It's kept only so templates that
-    read the raw ``days`` list keep working, so it's a diagnostic entity that
-    new installs get disabled. The ``days`` attribute is over 1 MB for two
-    weeks of menus, far past the recorder's 16 KB limit, so it's excluded
-    from the database.
-    """
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_entity_registry_enabled_default = False
-    _unrecorded_attributes = frozenset({ATTR_DAYS})
-
-    def __init__(
-        self,
-        coordinator: NutrisliceCoordinator,
-        entry: ConfigEntry,
-        menu_type_slug: str,
-    ) -> None:
-        """Initialize legacy full menu sensor."""
-        super().__init__(coordinator, entry, menu_type_slug)
-        menu_name = (
-            self.menu_data.menu_type_name if self.menu_data else menu_type_slug.replace("-", " ").title()
-        )
-        self._attr_name = menu_entity_name(coordinator.school_name, menu_name, "Menu")
-        self._attr_unique_id = (
-            f"{coordinator.district}_{coordinator.school_slug}_{menu_type_slug}_menu"
-        )
-        self._attr_icon = "mdi:silverware-fork-knife"
-
-    @property
-    def native_value(self) -> str:
-        """Return current date to match legacy sensor value_template (value_json.date)."""
-        return dt_util.now().date().isoformat()
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return raw 'days' list for full backward compatibility."""
-        if not self.menu_data:
-            return {
-                ATTR_DAYS: [],
-                ATTR_DISTRICT: self.coordinator.district,
-                ATTR_SCHOOL_NAME: self.coordinator.school_name,
-                ATTR_MENU_TYPE: self.menu_type_slug,
-            }
-
-        return {
-            ATTR_DAYS: self.menu_data.days,
-            ATTR_DISTRICT: self.menu_data.district,
-            ATTR_SCHOOL_NAME: self.menu_data.school_name,
-            ATTR_MENU_TYPE: self.menu_data.menu_type_name,
-            ATTR_LAST_UPDATED: self.menu_data.last_updated.isoformat(),
-        }
+        return {**self._menu_attributes(target), "is_next_school_day": is_next_school_day}

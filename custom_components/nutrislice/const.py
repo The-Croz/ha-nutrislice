@@ -35,9 +35,15 @@ COURSE_EMOJI: Final = {
     "vegetables": "🥦",
     "beverages": "🥛",
 }
+COURSE_HEADINGS: Final = {
+    "entrees": "Entrees",
+    "sides": "Sides",
+    "fruits": "Fruit",
+    "vegetables": "Vegetables",
+    "beverages": "Beverages",
+}
 DEFAULT_TITLE_SECTIONS: Final = ["entrees"]
 
-ATTR_DAYS: Final = "days"
 ATTR_DATE: Final = "date"
 ATTR_ENTREES: Final = "entrees"
 ATTR_SIDES: Final = "sides"
@@ -45,8 +51,8 @@ ATTR_MENU_ITEMS: Final = "menu_items"
 ATTR_CATEGORIES: Final = "categories"
 ATTR_SCHOOL_NAME: Final = "school_name"
 ATTR_MENU_TYPE: Final = "menu_type"
-ATTR_DISTRICT: Final = "district"
 ATTR_LAST_UPDATED: Final = "last_updated"
+ATTR_MENU_MARKDOWN: Final = "menu_markdown"
 
 # Entree category tags & section keywords for classifying items
 ENTREE_FOOD_CATEGORIES: Final = {

@@ -58,7 +58,6 @@ class TestNutrisliceCalendar(unittest.IsolatedAsyncioTestCase):
             school_name="Lincoln Elementary",
             menu_type_slug="lunch",
             menu_type_name="Lunch",
-            days=[today_menu.raw_day, future_menu.raw_day],
             days_by_date={self.today_str: today_menu, future_date.isoformat(): future_menu},
             today=today_menu,
             tomorrow=None,

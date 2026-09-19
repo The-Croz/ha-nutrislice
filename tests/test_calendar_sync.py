@@ -60,7 +60,6 @@ def make_menu(slug, name, days):
         school_name="Lincoln Elementary",
         menu_type_slug=slug,
         menu_type_name=name,
-        days=[d.raw_day for d in days],
         days_by_date={d.date_str: d for d in days},
         today=None,
         tomorrow=None,
