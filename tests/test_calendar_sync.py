@@ -163,11 +163,32 @@ class TestCalendarSync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(await async_sync_entry(hass, entry, self.coordinator), 0)
 
+    async def test_uses_the_configured_title_sections(self):
+        hass = self.hass()
+        entry = MockConfigEntry(options={"sync_calendar": TARGET, "title_sections": ["entrees", "sides"]})
+
+        await async_sync_entry(hass, entry, self.coordinator)
+
+        self.assertEqual(hass.services.created[0]["summary"], "Lunch: 🍽️ Cheeseburger, Pizza 🥖 Apple")
+
+    async def test_changing_title_sections_does_not_duplicate(self):
+        """Every title style ever produced counts as the same meal."""
+        for title in ("🍽️ Lunch", "Lunch: 🍽️ Old 🥖 Stuff", "🍽️ Lunch: Old", "Lunch: Old"):
+            with self.subTest(title=title):
+                existing = [
+                    {"start": self.today.isoformat(), "summary": title, "location": "Lincoln Elementary"},
+                    {"start": (self.today + timedelta(days=2)).isoformat(), "summary": title, "location": "Lincoln Elementary"},
+                ]
+                hass = self.hass(existing=existing)
+                entry = MockConfigEntry(options={"sync_calendar": TARGET, "title_sections": []})
+                self.assertEqual(await async_sync_entry(hass, entry, self.coordinator), 0)
+
     async def test_similar_menu_name_is_not_a_match(self):
         """A "Preschool Lunch" event doesn't count as the "Lunch" meal."""
         existing = [
             {"start": self.today.isoformat(), "summary": "🍽️ Preschool Lunch: Pasta", "location": "Lincoln Elementary"},
             {"start": self.today.isoformat(), "summary": "Preschool Lunch: Pasta", "location": "Lincoln Elementary"},
+            {"start": self.today.isoformat(), "summary": "🍽️ Preschool Lunch", "location": "Lincoln Elementary"},
         ]
         hass = self.hass(existing=existing)
         entry = MockConfigEntry(options={"sync_calendar": TARGET})

@@ -177,6 +177,41 @@ class TestNutrisliceCoordinatorParser(unittest.TestCase):
         self.assertTrue(parsed.summary.endswith("..."))
 
 
+class TestEventTitleSections(unittest.TestCase):
+    """The courses chosen in the options decide what an event title shows."""
+
+    def setUp(self):
+        self.day = parse_day(REAL_LUNCH)
+
+    def test_default_is_entrees_with_meal_emoji(self):
+        self.assertEqual(
+            self.day.calendar_summary("Lunch"),
+            "🍽️ Lunch: Peanut Butter & Jelly Sandwich, Salisbury Steak, Pepperoni Pizza, Egg Chef Salad",
+        )
+        self.assertEqual(self.day.calendar_summary("Lunch", ["entrees"]), self.day.calendar_summary("Lunch"))
+
+    def test_several_courses_each_led_by_their_emoji(self):
+        self.assertEqual(
+            self.day.calendar_summary("Lunch", ["entrees", "sides", "fruits"]),
+            "Lunch: 🍽️ Peanut Butter & Jelly Sandwich, Salisbury Steak, Pepperoni Pizza, Egg Chef Salad"
+            " 🥖 Fresh Baked Breadstick, Dinner Roll 🍎 Red Delicious Apple",
+        )
+
+    def test_courses_follow_menu_order_not_selection_order(self):
+        self.assertEqual(
+            self.day.calendar_summary("Lunch", ["beverages", "vegetables"]),
+            "Lunch: 🥦 Mashed Potatoes 🥛 Fruit Juice, 1% Milk",
+        )
+
+    def test_empty_course_is_skipped(self):
+        no_veg = parse_day({**REAL_LUNCH, "menu_items": [i for i in REAL_LUNCH["menu_items"] if i.get("text") != "Vegetable" and (i.get("food") or {}).get("name") != "Mashed Potatoes"]})
+        self.assertEqual(no_veg.calendar_summary("Lunch", ["vegetables", "fruits"]), "Lunch: 🍎 Red Delicious Apple")
+
+    def test_nothing_selected_shows_just_the_meal(self):
+        self.assertEqual(self.day.calendar_summary("Lunch", []), "🍽️ Lunch")
+        self.assertEqual(self.day.calendar_summary("Breakfast", []), "🥞 Breakfast")
+
+
 class TestClassification(unittest.TestCase):
     """Items are grouped by their own category before the section they're listed under."""
 

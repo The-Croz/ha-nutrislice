@@ -209,6 +209,19 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["data"]["district"], "sample-district")
         self.assertEqual(result["data"]["school_slug"], "lincoln-elementary")
         self.assertEqual(result["data"]["menu_types"], [{"slug": "lunch", "name": "Lunch"}])
+        # Not chosen during setup -> default, stored as an option
+        self.assertEqual(result["options"], {"title_sections": ["entrees"]})
+
+    async def test_step_menu_types_stores_chosen_title_sections(self):
+        self.flow._district = "sample-district"
+        self.flow._selected_school = LINCOLN
+
+        result = await self.flow.async_step_menu_types(
+            {"menu_types": ["lunch"], "title_sections": ["entrees", "fruits"]}
+        )
+
+        self.assertEqual(result["options"], {"title_sections": ["entrees", "fruits"]})
+        self.assertNotIn("title_sections", result["data"])
 
     async def test_options_flow(self):
         """Test options flow allows changing scan interval, weekend preference, and sync calendar."""
@@ -229,11 +242,13 @@ class TestNutrisliceConfigFlow(unittest.IsolatedAsyncioTestCase):
                 "scan_interval_hours": 6,
                 "next_school_day_on_weekend": True,
                 "sync_calendar": "calendar.family",
+                "title_sections": ["entrees", "sides"],
             }
         )
         self.assertEqual(res_submit["type"], "create_entry")
         self.assertEqual(res_submit["data"]["scan_interval_hours"], 6)
         self.assertEqual(res_submit["data"]["sync_calendar"], "calendar.family")
+        self.assertEqual(res_submit["data"]["title_sections"], ["entrees", "sides"])
 
 
 if __name__ == "__main__":

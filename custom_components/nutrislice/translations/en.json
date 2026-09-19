@@ -24,7 +24,11 @@
         "title": "Select Menus to Track",
         "description": "Choose which meal menus you want to track for {school_name}:",
         "data": {
-          "menu_types": "Meal Menus"
+          "menu_types": "Meal Menus",
+          "title_sections": "Show in calendar event titles"
+        },
+        "data_description": {
+          "title_sections": "Each course you tick is added to the event title, led by its emoji. With only Entrees ticked, titles look like: Lunch: Cheeseburger, Pizza. Tick none to show just the meal name. The full menu is always in the event description."
         }
       }
     },
@@ -49,10 +53,12 @@
         "data": {
           "scan_interval_hours": "Update Interval (hours)",
           "next_school_day_on_weekend": "Show next school day menu on weekends for 'Tomorrow' sensor",
-          "sync_calendar": "Sync menus to calendar"
+          "sync_calendar": "Sync menus to calendar",
+          "title_sections": "Show in calendar event titles"
         },
         "data_description": {
-          "sync_calendar": "Optional. Copy upcoming meals as all-day events into another calendar, such as a Local Calendar or Google Calendar. Leave empty to turn off. Events already synced are not changed or removed."
+          "sync_calendar": "Optional. Copy upcoming meals as all-day events into another calendar, such as a Local Calendar or Google Calendar. Leave empty to turn off. Events already synced are not changed or removed.",
+          "title_sections": "Each course you tick is added to the event title, led by its emoji. With only Entrees ticked, titles look like: Lunch: Cheeseburger, Pizza. Tick none to show just the meal name. The full menu is always in the event description. Changing this doesn't rewrite meals already synced to another calendar."
         }
       }
     }
@@ -61,6 +67,17 @@
     "sync_calendar": {
       "name": "Sync calendar",
       "description": "Copy upcoming meals into each school's configured sync calendar now, instead of waiting for the next menu update."
+    }
+  },
+  "selector": {
+    "title_sections": {
+      "options": {
+        "entrees": "🍽️ Entrees",
+        "sides": "🥖 Sides",
+        "fruits": "🍎 Fruit",
+        "vegetables": "🥦 Vegetables",
+        "beverages": "🥛 Beverages"
+      }
     }
   }
 }

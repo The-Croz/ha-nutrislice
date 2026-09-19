@@ -53,7 +53,7 @@ The integration includes an interactive UI setup flow to find your school:
    - **Link to your school's Nutrislice menu** — the reliable option. Paste any address from your school's menu site, e.g. `https://my-district.nutrislice.com/menu/my-school/lunch`. A link that includes your school skips straight to Step 3.
    - **Or search by district name** — e.g. `Souderton` or `Fairfax County Public Schools`. See the caveat below.
 4. **Step 2 (School Selection):** Pick your school from the list. If the search matched more than one district, each school is labelled with its district.
-5. **Step 3 (Menu Types):** Select which meal menus to track (e.g. `Lunch`, `Breakfast`, `Snack`).
+5. **Step 3 (Menu Types):** Select which meal menus to track (e.g. `Lunch`, `Breakfast`, `Snack`), and which courses to show in calendar event titles.
 6. Click **Submit**. Your school device, sensors, and calendar entities are created automatically.
 
 ### Finding your link
@@ -179,6 +179,7 @@ initial_view: listWeek
 Click **Configure** on the Nutrislice integration entry in **Settings** > **Devices & Services**:
 - **Update Interval (hours):** Adjust how frequently Home Assistant checks for menu updates (1 to 24 hours, default `4`).
 - **Show Next School Day on Weekends:** When enabled, the `Tomorrow` sensor will show the next school day's meal when tomorrow has no menu, such as on Friday evening, weekends, and holidays.
+- **Show in Calendar Event Titles:** Tick which courses appear in event titles: 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, 🥛 Beverages. The default, Entrees only, gives `🍽️ Lunch: Cheeseburger, Pizza`. Tick more and each course is led by its emoji, e.g. `Lunch: 🍽️ Cheeseburger, Pizza 🍎 Apple, Orange`. Tick none for just `🍽️ Lunch`. The full grouped menu is always in the event description. Also offered during setup.
 - **Sync Menus to Calendar:** Optional. Copy upcoming meals into another calendar. See [Syncing Menus to Another Calendar](#-syncing-menus-to-another-calendar).
 
 ---

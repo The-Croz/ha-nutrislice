@@ -26,13 +26,28 @@ from .const import (
     CONF_SCHOOL_NAME,
     CONF_SCHOOL_SLUG,
     CONF_SYNC_CALENDAR,
+    CONF_TITLE_SECTIONS,
+    COURSE_EMOJI,
     DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
     DEFAULT_SCAN_INTERVAL_HOURS,
+    DEFAULT_TITLE_SECTIONS,
     DOMAIN,
     EXAMPLE_MENU_URL,
     LOGGER,
     LOOKUP_URL,
 )
+
+
+def title_sections_selector() -> selector.SelectSelector:
+    """Checkboxes choosing which courses appear in calendar event titles."""
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=list(COURSE_EMOJI),
+            multiple=True,
+            mode=selector.SelectSelectorMode.LIST,
+            translation_key=CONF_TITLE_SECTIONS,
+        )
+    )
 
 
 class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -240,6 +255,12 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_SCHOOL_NAME: school_name,
                         CONF_MENU_TYPES: configured_menus,
                     },
+                    # Kept in options so it can be changed later under Configure
+                    options={
+                        CONF_TITLE_SECTIONS: user_input.get(
+                            CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS
+                        )
+                    },
                 )
 
         # Determine default selections
@@ -264,6 +285,9 @@ class NutrisliceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         mode=selector.SelectSelectorMode.LIST,
                     )
                 ),
+                vol.Optional(
+                    CONF_TITLE_SECTIONS, default=DEFAULT_TITLE_SECTIONS
+                ): title_sections_selector(),
             }
         )
 
@@ -321,6 +345,12 @@ class NutrisliceOptionsFlowHandler(config_entries.OptionsFlow):
                         DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND,
                     ),
                 ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_TITLE_SECTIONS,
+                    default=self.config_entry.options.get(
+                        CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS
+                    ),
+                ): title_sections_selector(),
                 # suggested_value (not default) so the field can be cleared
                 vol.Optional(
                     CONF_SYNC_CALENDAR,

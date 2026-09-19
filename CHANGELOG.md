@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Choose what calendar event titles show.** A new "Show in calendar event titles" setting, offered during setup and under **Configure**, has a checkbox for each course: 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, and 🥛 Beverages. Entrees only is the default and keeps titles as before. With more ticked, each course is led by its emoji (`Lunch: 🍽️ Cheeseburger, Pizza 🍎 Apple`). With none ticked, the title is just `🍽️ Lunch`.
+
+### Changed
+- Calendar sync recognizes a meal it already synced whatever the title style, so changing the title setting doesn't duplicate synced meals. Existing synced events keep their old title.
+
 ## [1.4.0] - 2026-09-18
 
 ### Changed

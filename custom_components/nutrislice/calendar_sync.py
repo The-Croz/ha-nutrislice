@@ -13,6 +13,7 @@ sync safe to run after every refresh.
 from __future__ import annotations
 
 from datetime import date, timedelta
+import re
 
 from homeassistant.components.calendar import DOMAIN as CALENDAR_DOMAIN
 from homeassistant.config_entries import ConfigEntry
@@ -20,12 +21,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_SYNC_CALENDAR, LOGGER
+from .const import (
+    CONF_SYNC_CALENDAR,
+    CONF_TITLE_SECTIONS,
+    DEFAULT_TITLE_SECTIONS,
+    LOGGER,
+)
 from .coordinator import (
     NutrisliceCoordinator,
     NutrisliceMenuData,
     ParsedDayMenu,
-    calendar_title_prefix,
 )
 
 
@@ -40,12 +45,16 @@ async def async_sync_entry(
     if not target or not coordinator.data:
         return 0
 
+    sections = entry.options.get(CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS)
     async with coordinator.sync_lock:
-        return await _async_sync(hass, coordinator, target)
+        return await _async_sync(hass, coordinator, target, sections)
 
 
 async def _async_sync(
-    hass: HomeAssistant, coordinator: NutrisliceCoordinator, target: str
+    hass: HomeAssistant,
+    coordinator: NutrisliceCoordinator,
+    target: str,
+    sections: list[str],
 ) -> int:
     """Create any upcoming meals missing from the target calendar."""
     today = dt_util.now().date()
@@ -78,7 +87,7 @@ async def _async_sync(
                 "create_event",
                 {
                     "entity_id": target,
-                    "summary": day.calendar_summary(menu.menu_type_name),
+                    "summary": day.calendar_summary(menu.menu_type_name, sections),
                     "description": day.formatted_description,
                     "location": menu.school_name,
                     "start_date": day.target_date.isoformat(),
@@ -123,16 +132,18 @@ def _is_synced(
     """Return True if this meal is already on the calendar.
 
     Matches on day, school, and menu name rather than the full title, so a meal
-    whose entrees changed after syncing isn't duplicated. Titles from before
-    1.4.0 had no emoji ("Lunch: ..."), and still count.
+    isn't duplicated when its entrees change, when the title settings change,
+    or across title styles from older releases ("Lunch: ...", "🍽️ Lunch: ...",
+    "🍽️ Lunch").
     """
-    title_prefixes = (
-        calendar_title_prefix(menu.menu_type_name),
-        f"{menu.menu_type_name}: ",
-    )
     return any(
         str(event.get("start", ""))[:10] == day.date_str
         and event.get("location") == menu.school_name
-        and str(event.get("summary", "")).startswith(title_prefixes)
+        and _title_menu_name(str(event.get("summary", ""))) == menu.menu_type_name
         for event in existing
     )
+
+
+def _title_menu_name(summary: str) -> str:
+    """Return the menu name an event title starts with, ignoring a leading emoji."""
+    return re.sub(r"^\W+", "", summary).split(":", 1)[0].strip()

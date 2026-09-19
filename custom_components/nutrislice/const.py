@@ -15,6 +15,7 @@ CONF_MENU_TYPES: Final = "menu_types"
 CONF_SCAN_INTERVAL_HOURS: Final = "scan_interval_hours"
 CONF_NEXT_SCHOOL_DAY_ON_WEEKEND: Final = "next_school_day_on_weekend"
 CONF_SYNC_CALENDAR: Final = "sync_calendar"
+CONF_TITLE_SECTIONS: Final = "title_sections"
 
 SERVICE_SYNC_CALENDAR: Final = "sync_calendar"
 
@@ -25,6 +26,16 @@ EXAMPLE_MENU_URL: Final = "https://my-district.nutrislice.com/menu/my-school/lun
 DEFAULT_SCAN_INTERVAL_HOURS: Final = 4
 DEFAULT_UPCOMING_WEEKS: Final = 2
 DEFAULT_NEXT_SCHOOL_DAY_ON_WEEKEND: Final = True
+
+# Courses, in display order, with the emoji used in event titles and descriptions
+COURSE_EMOJI: Final = {
+    "entrees": "🍽️",
+    "sides": "🥖",
+    "fruits": "🍎",
+    "vegetables": "🥦",
+    "beverages": "🥛",
+}
+DEFAULT_TITLE_SECTIONS: Final = ["entrees"]
 
 ATTR_DAYS: Final = "days"
 ATTR_DATE: Final = "date"

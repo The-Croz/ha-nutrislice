@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS, DOMAIN
 from .coordinator import (
     NutrisliceCoordinator,
     NutrisliceMenuData,
@@ -82,7 +82,10 @@ class NutrisliceCalendarEntity(CoordinatorEntity[NutrisliceCoordinator], Calenda
         return CalendarEvent(
             start=day.target_date,
             end=day.target_date + timedelta(days=1),
-            summary=day.calendar_summary(menu_name),
+            summary=day.calendar_summary(
+                menu_name,
+                self.entry.options.get(CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS),
+            ),
             description=day.formatted_description,
             location=self.coordinator.school_name,
         )

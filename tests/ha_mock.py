@@ -54,8 +54,8 @@ class MockConfigFlow:
             "description_placeholders": description_placeholders or {},
         }
 
-    def async_create_entry(self, title, data):
-        return {"type": "create_entry", "title": title, "data": data}
+    def async_create_entry(self, title, data, options=None):
+        return {"type": "create_entry", "title": title, "data": data, "options": options or {}}
 
     async def async_set_unique_id(self, unique_id):
         self.unique_id = unique_id

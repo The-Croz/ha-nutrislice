@@ -20,6 +20,8 @@ from .const import (
     CONF_SCHOOL_SLUG,
     DEFAULT_SCAN_INTERVAL_HOURS,
     BEVERAGE_FOOD_CATEGORIES,
+    COURSE_EMOJI,
+    DEFAULT_TITLE_SECTIONS,
     CONDIMENT_FOOD_CATEGORIES,
     CONDIMENT_FOOD_CATEGORY_PREFIXES,
     DEFAULT_UPCOMING_WEEKS,
@@ -81,27 +83,60 @@ class ParsedDayMenu:
         return text
 
     @property
+    def courses(self) -> dict[str, list[str]]:
+        """Return the menu split into courses, in display order.
+
+        Fruit and vegetables are pulled out of ``sides`` so each appears once.
+        """
+        split_out = set(self.fruits) | set(self.vegetables)
+        return {
+            "entrees": self.entrees,
+            "sides": [name for name in self.sides if name not in split_out],
+            "fruits": self.fruits,
+            "vegetables": self.vegetables,
+            "beverages": self.beverages,
+        }
+
+    @property
     def formatted_description(self) -> str:
         """Menu grouped by course with emoji headings, for calendar events and notifications."""
-        other_sides = [s for s in self.sides if s not in self.fruits and s not in self.vegetables]
-        groups = (
-            ("🍽️ Entrees", self.entrees),
-            ("🥖 Sides", other_sides),
-            ("🍎 Fruit", self.fruits),
-            ("🥦 Vegetables", self.vegetables),
-            ("🥛 Beverages", self.beverages),
-        )
+        headings = {
+            "entrees": "Entrees",
+            "sides": "Sides",
+            "fruits": "Fruit",
+            "vegetables": "Vegetables",
+            "beverages": "Beverages",
+        }
         blocks = [
-            f"{heading}:\n" + "\n".join(f"• {name}" for name in names)
-            for heading, names in groups
+            f"{COURSE_EMOJI[course]} {headings[course]}:\n"
+            + "\n".join(f"• {name}" for name in names)
+            for course, names in self.courses.items()
             if names
         ]
         return "\n\n".join(blocks) if blocks else "No menu items published."
 
-    def calendar_summary(self, menu_name: str) -> str:
-        """Return the calendar event title, e.g. "🍽️ Lunch: Cheeseburger, Pizza"."""
-        return f"{calendar_title_prefix(menu_name)}{self.summary}"
+    def calendar_summary(
+        self, menu_name: str, sections: list[str] | None = None
+    ) -> str:
+        """Return the calendar event title.
 
+        ``sections`` picks which courses appear. Entrees alone (the default)
+        gives "🍽️ Lunch: Cheeseburger, Pizza"; several courses are each led
+        by their emoji, "Lunch: 🍽️ Cheeseburger 🍎 Apple"; none gives "🍽️ Lunch".
+        """
+        if sections is None:
+            sections = DEFAULT_TITLE_SECTIONS
+        if list(sections) == ["entrees"] or not self.has_entrees:
+            return f"{calendar_title_prefix(menu_name)}{self.summary}"
+
+        parts = [
+            f"{COURSE_EMOJI[course]} {', '.join(names)}"
+            for course, names in self.courses.items()
+            if course in sections and names
+        ]
+        if not parts:
+            return f"{menu_emoji(menu_name)} {menu_name}"
+        return f"{menu_name}: {' '.join(parts)}"
 
 @dataclass
 class NutrisliceMenuData:
