@@ -115,6 +115,103 @@ class TestNutrisliceSensors(unittest.TestCase):
         self.assertEqual(attrs["school_name"], "Lincoln Elementary")
 
 
+class TestSensorStateSections(unittest.TestCase):
+    """The event-title course checkboxes also decide the Today and Tomorrow sensor states."""
+
+    def setUp(self):
+        today = date.today()
+        self.today = ParsedDayMenu(
+            date_str=today.isoformat(),
+            target_date=today,
+            is_holiday=False,
+            has_menu=True,
+            entrees=["Cheeseburger", "Cheese Pizza"],
+            sides=["Breadstick", "Apple", "Carrots"],
+            fruits=["Apple"],
+            vegetables=["Carrots"],
+            beverages=["Milk"],
+            raw_day={"date": today.isoformat()},
+        )
+        self.menu_data = NutrisliceMenuData(
+            district="sample-district",
+            school_slug="lincoln-elementary",
+            school_name="Lincoln Elementary",
+            menu_type_slug="lunch",
+            menu_type_name="Lunch",
+            days=[],
+            days_by_date={self.today.date_str: self.today},
+            today=self.today,
+            tomorrow=self.today,
+            next_school_day=None,
+            last_updated=datetime(2026, 9, 18, 12, 0, 0),
+        )
+        self.coord = MockCoordinator(data={"lunch": self.menu_data})
+
+    def states(self, **options):
+        entry = MockConfigEntry(options=options)
+        return (
+            NutrisliceTodayMenuSensor(self.coord, entry, "lunch").native_value,
+            NutrisliceTomorrowMenuSensor(self.coord, entry, "lunch").native_value,
+        )
+
+    def test_default_is_unchanged_entree_list(self):
+        self.assertEqual(self.states(), ("Cheeseburger, Cheese Pizza",) * 2)
+
+    def test_chosen_courses_each_led_by_emoji(self):
+        expected = "🍽️ Cheeseburger, Cheese Pizza 🥖 Breadstick 🍎 Apple"
+        self.assertEqual(
+            self.states(title_sections=["entrees", "sides", "fruits"]), (expected, expected)
+        )
+
+    def test_state_matches_the_calendar_title_minus_the_menu_name(self):
+        sections = ["entrees", "vegetables", "beverages"]
+        title = self.today.calendar_summary("Lunch", sections)
+        self.assertEqual(title, "Lunch: " + self.states(title_sections=sections)[0])
+
+    def test_no_courses_selected_shows_the_meal_name(self):
+        self.assertEqual(self.states(title_sections=[]), ("🍽️ Lunch",) * 2)
+
+    def test_no_menu_is_always_no_menu_scheduled(self):
+        """Automations rely on this exact value whatever the courses setting."""
+        self.menu_data.today = self.menu_data.tomorrow = ParsedDayMenu(
+            date_str="2026-09-19", target_date=date(2026, 9, 19), is_holiday=False, has_menu=False
+        )
+        for sections in (["entrees"], ["entrees", "sides"], []):
+            with self.subTest(sections=sections):
+                self.assertEqual(self.states(title_sections=sections), ("No Menu Scheduled",) * 2)
+
+    def test_long_states_fit_home_assistants_limit(self):
+        """Home Assistant rejects states over 255 characters."""
+        self.today.entrees = [f"Entree number {i} with a long name" for i in range(12)]
+        self.today.sides = self.today.fruits = [f"Fruit number {i} with a long name" for i in range(12)]
+        self.today.vegetables = [f"Vegetable number {i} with a long name" for i in range(12)]
+        state = self.states(title_sections=["entrees", "fruits", "vegetables", "beverages"])[0]
+        self.assertLessEqual(len(state), 255)
+        self.assertTrue(state.endswith("..."))
+
+    def test_attributes_are_unaffected_by_the_setting(self):
+        entry = MockConfigEntry(options={"title_sections": []})
+        attrs = NutrisliceTodayMenuSensor(self.coord, entry, "lunch").extra_state_attributes
+        self.assertEqual(attrs["entrees"], ["Cheeseburger", "Cheese Pizza"])
+        self.assertEqual(attrs["fruits"], ["Apple"])
+
+
+class TestMenuSensorIsDiagnostic(unittest.TestCase):
+    """The raw-data sensor is kept out of the way, and its huge attribute out of the database."""
+
+    def test_diagnostic_and_disabled_by_default(self):
+        self.assertEqual(NutrisliceFullMenuSensor._attr_entity_category, "diagnostic")
+        self.assertFalse(NutrisliceFullMenuSensor._attr_entity_registry_enabled_default)
+
+    def test_days_attribute_is_not_recorded(self):
+        self.assertIn("days", NutrisliceFullMenuSensor._unrecorded_attributes)
+
+    def test_other_sensors_are_normal_entities(self):
+        for sensor in (NutrisliceTodayMenuSensor, NutrisliceTomorrowMenuSensor):
+            self.assertIsNone(getattr(sensor, "_attr_entity_category", None))
+            self.assertTrue(getattr(sensor, "_attr_entity_registry_enabled_default", True))
+
+
 class TestEntityNaming(unittest.TestCase):
     """Test that entity names never repeat what the device name already says."""
 

@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -12,6 +13,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_TITLE_SECTIONS,
+    DEFAULT_TITLE_SECTIONS,
     ATTR_CATEGORIES,
     ATTR_DATE,
     ATTR_DAYS,
@@ -70,6 +73,11 @@ class NutrisliceBaseSensor(CoordinatorEntity[NutrisliceCoordinator], SensorEntit
         return self.coordinator.data.get(self.menu_type_slug)
 
     @property
+    def title_sections(self) -> list[str]:
+        """Courses to show in the state, chosen in the options (shared with the calendar)."""
+        return self.entry.options.get(CONF_TITLE_SECTIONS, DEFAULT_TITLE_SECTIONS)
+
+    @property
     def device_info(self) -> DeviceInfo:
         """Return device information to group school entities."""
         return DeviceInfo(
@@ -111,7 +119,9 @@ class NutrisliceTodayMenuSensor(NutrisliceBaseSensor):
         """Return today's menu summary."""
         if not self.menu_data or not self.menu_data.today:
             return "No Menu Scheduled"
-        return self.menu_data.today.summary
+        return self.menu_data.today.state_summary(
+            self.menu_data.menu_type_name, self.title_sections
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -198,7 +208,7 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
         target, _ = self._target_menu
         if not target:
             return "No Menu Scheduled"
-        return target.summary
+        return target.state_summary(self.menu_data.menu_type_name, self.title_sections)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -241,7 +251,19 @@ class NutrisliceTomorrowMenuSensor(NutrisliceBaseSensor):
 
 
 class NutrisliceFullMenuSensor(NutrisliceBaseSensor):
-    """Full menu sensor matching user's legacy REST sensor structure."""
+    """Raw Nutrislice menu data, for templates written against a REST sensor.
+
+    Nothing in the integration reads this entity: the calendar and the other
+    sensors use the coordinator directly. It's kept only so templates that
+    read the raw ``days`` list keep working, so it's a diagnostic entity that
+    new installs get disabled. The ``days`` attribute is over 1 MB for two
+    weeks of menus, far past the recorder's 16 KB limit, so it's excluded
+    from the database.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _unrecorded_attributes = frozenset({ATTR_DAYS})
 
     def __init__(
         self,

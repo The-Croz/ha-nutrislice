@@ -18,7 +18,7 @@ View upcoming meals on a Home Assistant calendar, show today's and tomorrow's me
 - 🍽️ **Smart Sensors:**
   - **Today's Menu:** Displays today's main entrees as state, with sides, allergens, and full menu items in attributes.
   - **Tomorrow's Menu:** Displays tomorrow's main entrees (with an option to preview Monday's lunch over the weekend!).
-  - **Full Menu (Raw / Legacy Compatible):** Exposes the full raw `days` list matching standard REST sensor formats so existing notification templates work with zero changes.
+  - **Raw Menu (diagnostic, off by default):** Exposes the full raw `days` list matching standard REST sensor formats, for templates written against one. Not needed for anything else.
 - 🛡️ **Rate-Limit Friendly:** Fetches 2 weeks in advance with configurable update polling (default: every 4 hours).
 - 🏷️ **Clean Item Categorization:** Separates entrees from sides, fruits, vegetables, milk, and condiments.
 
@@ -75,9 +75,11 @@ For each configured school and meal type:
 | Entity Pattern | Platform | Description |
 | :--- | :--- | :--- |
 | `calendar.<school>_<menu>` | Calendar | Upcoming school meals with entree summaries and formatted descriptions. |
-| `sensor.<school>_<menu>_today` | Sensor | State is today's main entree summary (e.g. `Cheeseburger, Pizza`). |
-| `sensor.<school>_<menu>_tomorrow` | Sensor | State is tomorrow's main entrees (or the next school day's meal on weekends). |
-| `sensor.<school>_<menu>_menu` | Sensor | State is the current date, with the full raw `days` structure in attributes. |
+| `sensor.<school>_<menu>_today` | Sensor | State is today's entrees (e.g. `Cheeseburger, Pizza`), or `No Menu Scheduled`. |
+| `sensor.<school>_<menu>_tomorrow` | Sensor | State is tomorrow's entrees (or the next school day's meal on weekends). |
+| `sensor.<school>_<menu>_menu` | Diagnostic sensor | Raw Nutrislice data in a `days` attribute, for templates written against a REST sensor. **Disabled by default** and hidden under the device's Diagnostic section; enable it there if you need it. |
+
+The Today and Tomorrow states show the same courses as your calendar event titles (see **Show in Calendar Titles and Sensors** under Options), so with the default they are the entree list shown above.
 
 `<school>` is the school's name and `<menu>` is the meal type, both lowercased with underscores. *(For example, a school named "Maple Grove" with a Lunch menu gets `sensor.maple_grove_lunch_today`, `sensor.maple_grove_lunch_tomorrow`, and `calendar.maple_grove_lunch`.)*
 
@@ -179,7 +181,7 @@ initial_view: listWeek
 Click **Configure** on the Nutrislice integration entry in **Settings** > **Devices & Services**:
 - **Update Interval (hours):** Adjust how frequently Home Assistant checks for menu updates (1 to 24 hours, default `4`).
 - **Show Next School Day on Weekends:** When enabled, the `Tomorrow` sensor will show the next school day's meal when tomorrow has no menu, such as on Friday evening, weekends, and holidays.
-- **Show in Calendar Event Titles:** Tick which courses appear in event titles: 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, 🥛 Beverages. The default, Entrees only, gives `🍽️ Lunch: Cheeseburger, Pizza`. Tick more and each course is led by its emoji, e.g. `Lunch: 🍽️ Cheeseburger, Pizza 🍎 Apple, Orange`. Tick none for just `🍽️ Lunch`. The full grouped menu is always in the event description. Also offered during setup.
+- **Show in Calendar Titles and Sensors:** Tick which courses appear in calendar event titles and in the Today and Tomorrow sensor states: 🍽️ Entrees, 🥖 Sides, 🍎 Fruit, 🥦 Vegetables, 🥛 Beverages. The default, Entrees only, gives `🍽️ Lunch: Cheeseburger, Pizza`. Tick more and each course is led by its emoji, e.g. `Lunch: 🍽️ Cheeseburger, Pizza 🍎 Apple, Orange`. Tick none for just `🍽️ Lunch`. The full grouped menu is always in the event description, and every item is in the sensor attributes. Also offered during setup.
 - **Sync Menus to Calendar:** Optional. Copy upcoming meals into another calendar. See [Syncing Menus to Another Calendar](#-syncing-menus-to-another-calendar).
 
 ---

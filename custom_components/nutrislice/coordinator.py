@@ -77,10 +77,7 @@ class ParsedDayMenu:
         """Return clean summary of entrees for state display (capped at 255 chars)."""
         if not self.has_entrees:
             return "No Menu Scheduled"
-        text = ", ".join(self.entrees)
-        if len(text) > 250:
-            return text[:247] + "..."
-        return text
+        return truncate_state(", ".join(self.entrees))
 
     @property
     def courses(self) -> dict[str, list[str]]:
@@ -115,6 +112,18 @@ class ParsedDayMenu:
         ]
         return "\n\n".join(blocks) if blocks else "No menu items published."
 
+    def courses_text(self, sections: list[str]) -> str:
+        """Return the chosen courses on one line, each led by its emoji.
+
+        For example "🍽️ Cheeseburger, Pizza 🍎 Apple". Courses with nothing on
+        the menu that day, and unknown section names, are skipped.
+        """
+        return " ".join(
+            f"{COURSE_EMOJI[course]} {', '.join(names)}"
+            for course, names in self.courses.items()
+            if course in sections and names
+        )
+
     def calendar_summary(
         self, menu_name: str, sections: list[str] | None = None
     ) -> str:
@@ -129,14 +138,28 @@ class ParsedDayMenu:
         if list(sections) == ["entrees"] or not self.has_entrees:
             return f"{calendar_title_prefix(menu_name)}{self.summary}"
 
-        parts = [
-            f"{COURSE_EMOJI[course]} {', '.join(names)}"
-            for course, names in self.courses.items()
-            if course in sections and names
-        ]
-        if not parts:
+        text = self.courses_text(sections)
+        if not text:
             return f"{menu_emoji(menu_name)} {menu_name}"
-        return f"{menu_name}: {' '.join(parts)}"
+        return f"{menu_name}: {text}"
+
+    def state_summary(
+        self, menu_name: str, sections: list[str] | None = None
+    ) -> str:
+        """Return the sensor state: the event title without its menu name.
+
+        The same courses as :meth:`calendar_summary`, so the sensors and the
+        calendar always agree, cut down to fit Home Assistant's state limit.
+        A day with no menu is always "No Menu Scheduled", which automations
+        can rely on.
+        """
+        if sections is None:
+            sections = DEFAULT_TITLE_SECTIONS
+        if list(sections) == ["entrees"] or not self.has_entrees:
+            return self.summary
+        return truncate_state(
+            self.courses_text(sections) or f"{menu_emoji(menu_name)} {menu_name}"
+        )
 
 @dataclass
 class NutrisliceMenuData:
@@ -153,6 +176,17 @@ class NutrisliceMenuData:
     tomorrow: ParsedDayMenu | None
     next_school_day: ParsedDayMenu | None
     last_updated: datetime
+
+
+# Home Assistant rejects sensor states longer than 255 characters; leave headroom
+STATE_TEXT_LIMIT = 250
+
+
+def truncate_state(text: str) -> str:
+    """Shorten text to fit in a sensor state, marking the cut with "..."."""
+    if len(text) > STATE_TEXT_LIMIT:
+        return text[: STATE_TEXT_LIMIT - 3] + "..."
+    return text
 
 
 def menu_emoji(menu_name: str) -> str:

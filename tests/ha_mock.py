@@ -214,6 +214,7 @@ def setup_ha_mocks():
 
     ha_const = types.ModuleType("homeassistant.const")
     ha_const.Platform = MockPlatform
+    ha_const.EntityCategory = types.SimpleNamespace(DIAGNOSTIC="diagnostic", CONFIG="config")
 
     ha_ce = types.ModuleType("homeassistant.config_entries")
     ha_ce.ConfigEntry = MockConfigEntry
